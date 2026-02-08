@@ -20,6 +20,34 @@ init_db()
 # ---- Mobile-friendly UI tweaks ----
 st.markdown("""
 <style>
+            /* --- Responsive controls (filters + view buttons) --- */
+.ctrl-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .5rem;
+  align-items: center;
+}
+
+.ctrl-btn > div button {
+  width: 100%;
+  min-height: 42px;
+}
+
+/* Make icon buttons not too small */
+.icon-btn > div button {
+  min-width: 44px;
+  min-height: 42px;
+  padding: 0.35rem 0.6rem;
+}
+
+/* Mobile: bigger tap targets */
+@media (max-width: 700px) {
+  .ctrl-btn > div button,
+  .icon-btn > div button {
+    min-height: 46px;
+    font-size: 15px !important;
+  }
+}
 /* Make overall spacing tighter */
 div[data-testid="stVerticalBlock"] { gap: 0.6rem; }
 
@@ -467,29 +495,33 @@ with tab1:
     with left:
         st.subheader("PM Filters (Stations)")
         f1, f2, f3 = st.columns(3)
-        if f1.button("Show All"):
+        if f1.button("Show All", use_container_width=True):
             st.session_state["station_filter"] = "ALL"
-        if f2.button("🔴 PM Overdue"):
+        if f2.button("🔴 PM Overdue", use_container_width=True):
             st.session_state["station_filter"] = "OVERDUE"
-        if f3.button("🟠 PM Due Soon"):
+        if f3.button("🟠 PM Due Soon", use_container_width=True):
             st.session_state["station_filter"] = "DUESOON"
         if "station_filter" not in st.session_state:
             st.session_state["station_filter"] = "ALL"
 
     with right:
         st.subheader("View")
-        v1, v2, v3, v4 = st.columns(4)
-        if v1.button("📋", help="List"):
+
+        vrow1 = st.columns(2)
+        vrow2 = st.columns(2)
+
+        if vrow1[0].button("📋", help="List", use_container_width=True):
             st.session_state["view_mode"] = "LIST"
-        if v2.button("🟥", help="Big cards"):
+        if vrow1[1].button("🟥", help="Big cards", use_container_width=True):
             st.session_state["view_mode"] = "BIG"
-        if v3.button("🟧", help="Medium cards"):
+        if vrow2[0].button("🟧", help="Medium cards", use_container_width=True):
             st.session_state["view_mode"] = "MED"
-        if v4.button("🟨", help="Small cards"):
-            st.session_state["view_mode"] = "SMALL"
-        if "view_mode" not in st.session_state:
+        if vrow2[1].button("🟨", help="Small cards", use_container_width=True):
             st.session_state["view_mode"] = "SMALL"
 
+        if "view_mode" not in st.session_state:
+            st.session_state["view_mode"] = "SMALL"
+            
     if "selected_station" not in st.session_state:
         st.session_state["selected_station"] = None
 
@@ -527,54 +559,57 @@ with tab1:
         # Details panel
         sel = st.session_state.get("selected_station")
         if sel:
-    st.divider()
+             st.divider()
 
-    with st.expander(f"📌 Station Details — {sel}", expanded=True):
-        if st.button("Close Details", key="close_details"):
-            st.session_state["selected_station"] = None
-            st.rerun()
+        with st.expander(f"📌 Station Details — {sel}", expanded=True):
+            if st.button("Close Details", key="close_details"):
+                st.session_state["selected_station"] = None
+                st.rerun()
 
-        sg = df[df["station"] == sel].copy()
-        st.markdown(f"### {station_pm_header_status(sg)}")
+            sg = df[df["station"] == sel].copy()
+            st.markdown(f"### {station_pm_header_status(sg)}")
 
-        duty_df = sg[sg["role"] == "Duty"]
-        standby_df = sg[sg["role"] == "Standby"]
+            duty_df = sg[sg["role"] == "Duty"]
+            standby_df = sg[sg["role"] == "Standby"]
 
-        cols = st.columns(2)
+            cols = st.columns(2)
 
-        def render_gc(col, label, role_df, role_name):
-            with col:
-                st.markdown(f"#### {label}")
-                if len(role_df) == 0:
-                    st.warning(f"{role_name} GC not defined.")
-                    return
+            def render_gc(col, label, role_df, role_name):
+                with col:
+                    st.markdown(f"#### {label}")
+                    if len(role_df) == 0:
+                        st.warning(f"{role_name} GC not defined.")
+                        return
 
-                item = role_df.iloc[0]
-                aid = int(item["id"])
+                    item = role_df.iloc[0]
+                    aid = int(item["id"])
 
-                pm_date = item["pm_date"] if pd.notna(item.get("pm_date")) else "-"
-                pm_by = item["performed_by"] if pd.notna(item.get("performed_by")) else "-"
-                pm_attach = item.get("attachment_path")
-                evidence = "📎 Attached" if (pm_attach is not None and pd.notna(pm_attach) and str(pm_attach).strip()) else "⚪ No attachment"
-                next_due = item["next_pm_due"] if pd.notna(item.get("next_pm_due")) else "-"
+                    pm_date = item["pm_date"] if pd.notna(item.get("pm_date")) else "-"
+                    pm_by = item["performed_by"] if pd.notna(item.get("performed_by")) else "-"
+                    pm_attach = item.get("attachment_path")
+                    evidence = "📎 Attached" if (pm_attach is not None and pd.notna(pm_attach) and str(pm_attach).strip()) else "⚪ No attachment"
+                    next_due = item["next_pm_due"] if pd.notna(item.get("next_pm_due")) else "-"
 
-                st.write(f"**Tag:** {item['tag']}")
-                st.write(f"**Status:** {role_name}")
-                st.write(f"**Last PM Date:** {pm_date}")
-                st.write(f"**Performed By:** {pm_by}")
-                st.write(f"**Evidence:** {evidence}")
-                st.write(f"**Next PM Due:** {next_due}")
+                    st.write(f"**Tag:** {item['tag']}")
+                    st.write(f"**Status:** {role_name}")
+                    st.write(f"**Last PM Date:** {pm_date}")
+                    st.write(f"**Performed By:** {pm_by}")
+                    st.write(f"**Evidence:** {evidence}")
+                    st.write(f"**Next PM Due:** {next_due}")
 
-                if st.button("📎 PM + Attachment", key=f"pmatt_details_{sel}_{aid}"):
-                    st.session_state["open_attach_for"] = aid
-                    st.rerun()
+                    if st.button("📎 PM + Attachment", key=f"pmatt_details_{sel}_{aid}"):
+                        st.session_state["open_attach_for"] = aid
+                        st.rerun()
 
-                if pm_attach is not None and pd.notna(pm_attach) and str(pm_attach).strip():
-                    with st.expander("📎 View / Download last PM attachment"):
-                        show_attachment(str(pm_attach), key_prefix=f"details_{sel}_{aid}")
+                    if pm_attach is not None and pd.notna(pm_attach) and str(pm_attach).strip():
+                        with st.expander("📎 View / Download last PM attachment"):
+                            show_attachment(str(pm_attach), key_prefix=f"details_{sel}_{aid}")
 
-        render_gc(cols[0], "GC-01", duty_df, "Duty")
-        render_gc(cols[1], "GC-02", standby_df, "Standby")
+                        render_gc(cols[0], "GC-01", duty_df, "Duty")
+                        render_gc(cols[1], "GC-02", standby_df, "Standby")
+
+            
+
 
         # Shared PM+Attachment form
         open_for = st.session_state.get("open_attach_for")
