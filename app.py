@@ -1,10 +1,11 @@
-# app.py (UPDATED: List view click-from-table + Search box)
-# ✅ List view: no separate open buttons
-# ✅ Click station from a dropdown driven by the filtered table (table-like selection)
-# ✅ Search box (station/location/tag)
-#
-# NOTE: Streamlit dataframe itself can't do "click row to trigger" reliably without extra components.
-# So we do the clean official way: filter/search -> table -> "Open Station" selector from the same filtered results.
+# app.py (UPDATED: Customizable card views)
+# ✅ PM-only dashboard
+# ✅ Same tags can repeat across stations (GC-01/GC-02 per station)
+# ✅ Dashboard view modes: List | Big cards | Medium cards | Small cards (icon buttons)
+# ✅ Click station => Full details panel
+# ✅ Add Station Pair (add-only)
+# ✅ Edit Station tab
+# ✅ Attachments upload + view/download
 
 import streamlit as st
 import pandas as pd
@@ -16,6 +17,39 @@ from db import init_db, get_conn
 
 st.set_page_config(page_title="GC Analyzer PM Dashboard", layout="wide")
 init_db()
+# ---- Mobile-friendly UI tweaks ----
+st.markdown("""
+<style>
+/* Make overall spacing tighter */
+div[data-testid="stVerticalBlock"] { gap: 0.6rem; }
+
+/* Reduce padding on containers */
+section.main > div { padding-top: 1rem; padding-bottom: 1rem; }
+
+/* Make buttons a bit more compact */
+button[kind="secondary"], button[kind="primary"] { padding: 0.35rem 0.6rem; }
+
+/* Mobile adjustments */
+@media (max-width: 700px) {
+  html, body, [class*="css"] { font-size: 14px !important; }
+
+  /* Force columns to stack vertically */
+  div[data-testid="column"] {
+    width: 100% !important;
+    flex: 1 1 100% !important;
+    max-width: 100% !important;
+  }
+
+  /* Make tables scroll horizontally instead of squeezing */
+  div[data-testid="stDataFrame"] { overflow-x: auto; }
+
+  /* Smaller headers */
+  h1 { font-size: 1.4rem !important; }
+  h2 { font-size: 1.15rem !important; }
+  h3 { font-size: 1.05rem !important; }
+}
+</style>
+""", unsafe_allow_html=True)
 
 UPLOAD_DIR = Path("uploads")
 UPLOAD_DIR.mkdir(exist_ok=True)
@@ -105,13 +139,7 @@ def station_summary(df_all: pd.DataFrame, station: str):
     duty_ev = evidence_icon(duty["attachment_path"].iloc[0]) if len(duty) else "⚪"
     standby_ev = evidence_icon(standby["attachment_path"].iloc[0]) if len(standby) else "⚪"
 
-    # compact station search text
-    loc = safe_str(sg["location"].iloc[0] if len(sg) else None, "")
-    search_text = f"{station} {loc} {duty_tag} {standby_tag}".lower()
-
     return {
-        "station": station,
-        "location": loc,
         "header": header,
         "duty_tag": duty_tag,
         "standby_tag": standby_tag,
@@ -119,7 +147,6 @@ def station_summary(df_all: pd.DataFrame, station: str):
         "standby_due": standby_due,
         "duty_ev": duty_ev,
         "standby_ev": standby_ev,
-        "search_text": search_text
     }
 
 # -----------------------------
@@ -329,11 +356,12 @@ tab1, tab2, tab_edit, tab3 = st.tabs(["Dashboard", "Add Station Pair", "Edit Sta
 # Dashboard view renderer
 # -----------------------------
 def render_station_grid(df: pd.DataFrame, stations: list[str], mode: str):
+    # grid sizes
     if mode == "BIG":
         cols_per_row = 1
     elif mode == "MED":
         cols_per_row = 2
-    else:
+    else:  # SMALL
         cols_per_row = 3
 
     rows = [stations[i:i+cols_per_row] for i in range(0, len(stations), cols_per_row)]
@@ -386,13 +414,12 @@ def render_station_grid(df: pd.DataFrame, stations: list[str], mode: str):
                         st.rerun()
 
 def render_station_list(df: pd.DataFrame, stations: list[str]):
-    # build table
+    # list view uses dataframe + open buttons
     rows = []
     for station in stations:
         s = station_summary(df, station)
         rows.append({
             "Station": station,
-            "Location": s["location"],
             "PM": s["header"].replace("PM ", ""),
             "GC-01 Tag": s["duty_tag"],
             "GC-01 Due": s["duty_due"],
@@ -401,20 +428,21 @@ def render_station_list(df: pd.DataFrame, stations: list[str]):
             "GC-02 Due": s["standby_due"],
             "GC-02 Ev": s["standby_ev"],
         })
-    t = pd.DataFrame(rows)
 
+    t = pd.DataFrame(rows)
     st.dataframe(t, use_container_width=True, hide_index=True)
 
-    # Open from "table only": pick from the SAME filtered table results
-    st.markdown("#### Open station details")
-    choice = st.selectbox(
-        "Select Station (from the table results)",
-        options=t["Station"].tolist(),
-        key="list_open_select"
-    )
-    if st.button("Open Selected Station", key="list_open_btn"):
-        st.session_state["selected_station"] = choice
-        st.rerun()
+    st.caption("Open station details:")
+    # compact open buttons
+    btn_cols = st.columns(6)
+    idx = 0
+    for station in stations:
+        c = btn_cols[idx % 6]
+        with c:
+            if st.button(station, key=f"open_list_{station}"):
+                st.session_state["selected_station"] = station
+                st.rerun()
+        idx += 1
 
 # -----------------------------
 # Tab 1: Dashboard
@@ -433,13 +461,11 @@ with tab1:
     c3.metric("PM Overdue", overdue_count)
     c4.metric("PM Due Soon", due_soon_count)
 
-    # Search + Filters + View options
-    topL, topR = st.columns([2, 1])
+    # Filters + View options
+    left, right = st.columns([2, 1])
 
-    with topL:
-        st.subheader("Search + Filters")
-        search = st.text_input("Search (Station / Location / Tag)", placeholder="e.g., BCS-01 or GC-01 or Sohar")
-
+    with left:
+        st.subheader("PM Filters (Stations)")
         f1, f2, f3 = st.columns(3)
         if f1.button("Show All"):
             st.session_state["station_filter"] = "ALL"
@@ -450,7 +476,7 @@ with tab1:
         if "station_filter" not in st.session_state:
             st.session_state["station_filter"] = "ALL"
 
-    with topR:
+    with right:
         st.subheader("View")
         v1, v2, v3, v4 = st.columns(4)
         if v1.button("📋", help="List"):
@@ -470,37 +496,24 @@ with tab1:
     if len(df) == 0:
         st.info("No stations yet. Add station pairs first.")
     else:
-        # Build station summaries first (for search)
-        all_stations = sorted(df["station"].unique().tolist())
-        summaries = [station_summary(df, s) for s in all_stations]
-        summary_df = pd.DataFrame(summaries)
+        # station-level flags for filters
+        stations = []
+        for station, g in df.groupby("station"):
+            any_overdue = (g["pm_bucket"] == "Overdue").any()
+            any_due_soon = (g["pm_bucket"] == "Due Soon").any()
+            stations.append((station, any_overdue, any_due_soon))
+        station_df = pd.DataFrame(stations, columns=["station", "any_overdue", "any_due_soon"])
 
-        # Search filter
-        if search and search.strip():
-            q = search.strip().lower()
-            summary_df = summary_df[summary_df["search_text"].str.contains(q, na=False)]
+        mode = st.session_state["station_filter"]
+        filtered_stations = station_df["station"].tolist()
+        if mode == "OVERDUE":
+            filtered_stations = station_df[station_df["any_overdue"]]["station"].tolist()
+        elif mode == "DUESOON":
+            filtered_stations = station_df[station_df["any_due_soon"]]["station"].tolist()
 
-        # PM filter
-        if st.session_state["station_filter"] == "OVERDUE":
-            # keep stations where any GC overdue
-            keep = []
-            for s in summary_df["station"].tolist():
-                sg = df[df["station"] == s]
-                if (sg["pm_bucket"] == "Overdue").any():
-                    keep.append(s)
-            summary_df = summary_df[summary_df["station"].isin(keep)]
-        elif st.session_state["station_filter"] == "DUESOON":
-            keep = []
-            for s in summary_df["station"].tolist():
-                sg = df[df["station"] == s]
-                if (sg["pm_bucket"] == "Due Soon").any():
-                    keep.append(s)
-            summary_df = summary_df[summary_df["station"].isin(keep)]
+        filtered_stations = sorted(filtered_stations)
 
-        filtered_stations = sorted(summary_df["station"].tolist())
-
-        st.caption("Filtered stations count: " + str(len(filtered_stations)))
-
+        st.caption("Click a station to open full details.")
         vm = st.session_state["view_mode"]
         if vm == "LIST":
             render_station_list(df, filtered_stations)
@@ -514,52 +527,54 @@ with tab1:
         # Details panel
         sel = st.session_state.get("selected_station")
         if sel:
-            st.divider()
-            st.subheader(f"Station Details — {sel}")
-            if st.button("Close Details", key="close_details"):
-                st.session_state["selected_station"] = None
-                st.rerun()
+    st.divider()
 
-            sg = df[df["station"] == sel].copy()
-            st.markdown(f"### {station_pm_header_status(sg)}")
+    with st.expander(f"📌 Station Details — {sel}", expanded=True):
+        if st.button("Close Details", key="close_details"):
+            st.session_state["selected_station"] = None
+            st.rerun()
 
-            duty_df = sg[sg["role"] == "Duty"]
-            standby_df = sg[sg["role"] == "Standby"]
-            cols = st.columns(2)
+        sg = df[df["station"] == sel].copy()
+        st.markdown(f"### {station_pm_header_status(sg)}")
 
-            def render_gc(col, label, role_df, role_name):
-                with col:
-                    st.markdown(f"#### {label}")
-                    if len(role_df) == 0:
-                        st.warning(f"{role_name} GC not defined.")
-                        return
+        duty_df = sg[sg["role"] == "Duty"]
+        standby_df = sg[sg["role"] == "Standby"]
 
-                    item = role_df.iloc[0]
-                    aid = int(item["id"])
+        cols = st.columns(2)
 
-                    pm_date = item["pm_date"] if pd.notna(item.get("pm_date")) else "-"
-                    pm_by = item["performed_by"] if pd.notna(item.get("performed_by")) else "-"
-                    pm_attach = item.get("attachment_path")
-                    evidence = "📎 Attached" if (pm_attach is not None and pd.notna(pm_attach) and str(pm_attach).strip()) else "⚪ No attachment"
-                    next_due = item["next_pm_due"] if pd.notna(item.get("next_pm_due")) else "-"
+        def render_gc(col, label, role_df, role_name):
+            with col:
+                st.markdown(f"#### {label}")
+                if len(role_df) == 0:
+                    st.warning(f"{role_name} GC not defined.")
+                    return
 
-                    st.write(f"**Tag:** {item['tag']}")
-                    st.write(f"**Status:** {role_name}")
-                    st.write(f"**Last PM Date:** {pm_date}")
-                    st.write(f"**Performed By:** {pm_by}")
-                    st.write(f"**Evidence:** {evidence}")
-                    st.write(f"**Next PM Due:** {next_due}")
+                item = role_df.iloc[0]
+                aid = int(item["id"])
 
-                    if st.button("📎 PM + Attachment", key=f"pmatt_details_{sel}_{aid}"):
-                        st.session_state["open_attach_for"] = aid
-                        st.rerun()
+                pm_date = item["pm_date"] if pd.notna(item.get("pm_date")) else "-"
+                pm_by = item["performed_by"] if pd.notna(item.get("performed_by")) else "-"
+                pm_attach = item.get("attachment_path")
+                evidence = "📎 Attached" if (pm_attach is not None and pd.notna(pm_attach) and str(pm_attach).strip()) else "⚪ No attachment"
+                next_due = item["next_pm_due"] if pd.notna(item.get("next_pm_due")) else "-"
 
-                    if pm_attach is not None and pd.notna(pm_attach) and str(pm_attach).strip():
-                        with st.expander("📎 View / Download last PM attachment"):
-                            show_attachment(str(pm_attach), key_prefix=f"details_{sel}_{aid}")
+                st.write(f"**Tag:** {item['tag']}")
+                st.write(f"**Status:** {role_name}")
+                st.write(f"**Last PM Date:** {pm_date}")
+                st.write(f"**Performed By:** {pm_by}")
+                st.write(f"**Evidence:** {evidence}")
+                st.write(f"**Next PM Due:** {next_due}")
 
-            render_gc(cols[0], "GC-01", duty_df, "Duty")
-            render_gc(cols[1], "GC-02", standby_df, "Standby")
+                if st.button("📎 PM + Attachment", key=f"pmatt_details_{sel}_{aid}"):
+                    st.session_state["open_attach_for"] = aid
+                    st.rerun()
+
+                if pm_attach is not None and pd.notna(pm_attach) and str(pm_attach).strip():
+                    with st.expander("📎 View / Download last PM attachment"):
+                        show_attachment(str(pm_attach), key_prefix=f"details_{sel}_{aid}")
+
+        render_gc(cols[0], "GC-01", duty_df, "Duty")
+        render_gc(cols[1], "GC-02", standby_df, "Standby")
 
         # Shared PM+Attachment form
         open_for = st.session_state.get("open_attach_for")
@@ -611,6 +626,7 @@ with tab1:
 # -----------------------------
 with tab2:
     st.subheader("Add Station Pair (Duty + Standby)")
+
     with st.form("station_pair_form", clear_on_submit=True):
         station = st.text_input("Station name (unique)", placeholder="e.g., BCS-01")
         location = st.text_input("Location / Area", placeholder="e.g., BCS")
@@ -618,6 +634,7 @@ with tab2:
         standby_tag = st.text_input("Standby GC tag", value="GC-02")
         pm_interval_days = st.number_input("PM interval (days)", min_value=1, value=90, step=1)
         submitted = st.form_submit_button("Add Station Pair")
+
         if submitted:
             try:
                 add_station_pair_add_only(station, location, duty_tag, standby_tag, int(pm_interval_days))
@@ -630,6 +647,7 @@ with tab2:
 # -----------------------------
 with tab_edit:
     st.subheader("Edit Station")
+
     df = fetch_kpis()
     if len(df) == 0:
         st.info("No stations yet.")
@@ -658,6 +676,7 @@ with tab_edit:
             pm_interval_new = st.number_input("PM interval (days)", min_value=1, value=interval_current, step=1)
 
             save = st.form_submit_button("Save Changes")
+
             if save:
                 try:
                     update_station_pair(
