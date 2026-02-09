@@ -1,11 +1,14 @@
-# app.py (UPDATED: Customizable card views)
+# app.py (NO-JS + NO-CHARTS: modern + responsive + stable)
 # ✅ PM-only dashboard
 # ✅ Same tags can repeat across stations (GC-01/GC-02 per station)
-# ✅ Dashboard view modes: List | Big cards | Medium cards | Small cards (icon buttons)
+# ✅ Dashboard view modes: List | Big cards | Medium cards | Small cards
 # ✅ Click station => Full details panel
 # ✅ Add Station Pair (add-only)
 # ✅ Edit Station tab
 # ✅ Attachments upload + view/download
+# ✅ Mobile friendly CSS
+# ✅ NO JavaScript
+# ✅ NO Charts
 
 import streamlit as st
 import pandas as pd
@@ -17,65 +20,66 @@ from db import init_db, get_conn
 
 st.set_page_config(page_title="GC Analyzer PM Dashboard", layout="wide")
 init_db()
-# ---- Mobile-friendly UI tweaks ----
+
+# ---- Mobile-friendly + responsive UI tweaks ----
 st.markdown("""
 <style>
-            /* --- Responsive controls (filters + view buttons) --- */
-.ctrl-wrap {
-  display: flex;
-  flex-wrap: wrap;
-  gap: .5rem;
-  align-items: center;
-}
-
-.ctrl-btn > div button {
-  width: 100%;
-  min-height: 42px;
-}
-
-/* Make icon buttons not too small */
-.icon-btn > div button {
-  min-width: 44px;
-  min-height: 42px;
-  padding: 0.35rem 0.6rem;
-}
-
-/* Mobile: bigger tap targets */
-@media (max-width: 700px) {
-  .ctrl-btn > div button,
-  .icon-btn > div button {
-    min-height: 46px;
-    font-size: 15px !important;
-  }
-}
-/* Make overall spacing tighter */
-div[data-testid="stVerticalBlock"] { gap: 0.6rem; }
-
-/* Reduce padding on containers */
+/* Overall spacing */
+div[data-testid="stVerticalBlock"] { gap: 0.65rem; }
 section.main > div { padding-top: 1rem; padding-bottom: 1rem; }
 
-/* Make buttons a bit more compact */
+/* Buttons */
 button[kind="secondary"], button[kind="primary"] { padding: 0.35rem 0.6rem; }
 
 /* Mobile adjustments */
 @media (max-width: 700px) {
   html, body, [class*="css"] { font-size: 14px !important; }
-
-  /* Force columns to stack vertically */
   div[data-testid="column"] {
     width: 100% !important;
     flex: 1 1 100% !important;
     max-width: 100% !important;
   }
-
-  /* Make tables scroll horizontally instead of squeezing */
   div[data-testid="stDataFrame"] { overflow-x: auto; }
-
-  /* Smaller headers */
   h1 { font-size: 1.4rem !important; }
   h2 { font-size: 1.15rem !important; }
   h3 { font-size: 1.05rem !important; }
 }
+
+/* KPI cards */
+.kpi-row{
+  display:flex; gap:12px; justify-content:center; align-items:stretch; flex-wrap:wrap;
+  margin: 0.2rem 0 0.8rem 0;
+}
+.kpi-card{
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.10);
+  border-radius: 14px;
+  padding: 12px 14px;
+  width: 210px;
+  text-align:center;
+  box-shadow: 0 8px 22px rgba(0,0,0,0.12);
+}
+.kpi-title{ font-size: 0.85rem; opacity: .8; margin-bottom: 4px;}
+.kpi-value{ font-size: 2rem; font-weight: 750; line-height: 1.05; }
+.kpi-sub{ font-size: 0.8rem; opacity: .65; margin-top: 2px;}
+@media (max-width:700px){
+  .kpi-card{ width: 46vw; min-width: 160px; }
+  .kpi-value{ font-size: 1.6rem; }
+}
+
+/* Control bar */
+.control-bar{
+  display:flex; gap:12px; flex-wrap:wrap; align-items:flex-end; justify-content:space-between;
+  margin: 0.2rem 0 0.6rem 0;
+}
+.control-box{
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 14px;
+  padding: 10px 12px;
+  flex: 1 1 360px;
+}
+.small-label{ font-size: 0.78rem; opacity: .7; margin-bottom: 6px; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -123,7 +127,7 @@ def show_attachment(path_str: str | None, key_prefix: str):
 
     p = Path(str(path_str))
     if not p.exists():
-        st.warning("Attachment file not found on this PC.")
+        st.warning("Attachment file not found on this PC / server.")
         st.code(str(p))
         return
 
@@ -134,7 +138,7 @@ def show_attachment(path_str: str | None, key_prefix: str):
         st.image(str(p), caption=p.name, use_container_width=True)
 
     st.download_button(
-        label=f"📥 Download / View: {p.name}",
+        label=f"📥 Download: {p.name}",
         data=p.read_bytes(),
         file_name=p.name,
         mime=mime,
@@ -290,7 +294,6 @@ def update_station_pair(station_old: str, station_new: str, location: str,
         raise ValueError("Duty tag and Standby tag cannot be the same.")
 
     conn = get_conn()
-    cur = conn.cursor()
 
     existing = pd.read_sql_query(
         "SELECT id, role FROM analyzers WHERE station=? AND role IN ('Duty','Standby')",
@@ -334,6 +337,7 @@ def update_station_pair(station_old: str, station_new: str, location: str,
         conn.close()
         raise ValueError("Duplicate tag inside this station (station, tag must be unique).")
 
+    cur = conn.cursor()
     cur.execute("BEGIN")
     cur.execute("""
         UPDATE analyzers
@@ -381,18 +385,17 @@ st.title("GC Analyzer PM Tracking Dashboard")
 tab1, tab2, tab_edit, tab3 = st.tabs(["Dashboard", "Add Station Pair", "Edit Station", "Logs & Attachments"])
 
 # -----------------------------
-# Dashboard view renderer
+# Dashboard renderers
 # -----------------------------
 def render_station_grid(df: pd.DataFrame, stations: list[str], mode: str):
-    # grid sizes
     if mode == "BIG":
         cols_per_row = 1
     elif mode == "MED":
         cols_per_row = 2
-    else:  # SMALL
+    else:
         cols_per_row = 3
 
-    rows = [stations[i:i+cols_per_row] for i in range(0, len(stations), cols_per_row)]
+    rows = [stations[i:i + cols_per_row] for i in range(0, len(stations), cols_per_row)]
     for row_stations in rows:
         cols = st.columns(cols_per_row)
         for i, station in enumerate(row_stations):
@@ -442,7 +445,6 @@ def render_station_grid(df: pd.DataFrame, stations: list[str], mode: str):
                         st.rerun()
 
 def render_station_list(df: pd.DataFrame, stations: list[str]):
-    # list view uses dataframe + open buttons
     rows = []
     for station in stations:
         s = station_summary(df, station)
@@ -461,16 +463,12 @@ def render_station_list(df: pd.DataFrame, stations: list[str]):
     st.dataframe(t, use_container_width=True, hide_index=True)
 
     st.caption("Open station details:")
-    # compact open buttons
     btn_cols = st.columns(6)
-    idx = 0
-    for station in stations:
-        c = btn_cols[idx % 6]
-        with c:
+    for idx, station in enumerate(stations):
+        with btn_cols[idx % 6]:
             if st.button(station, key=f"open_list_{station}"):
                 st.session_state["selected_station"] = station
                 st.rerun()
-        idx += 1
 
 # -----------------------------
 # Tab 1: Dashboard
@@ -483,60 +481,95 @@ with tab1:
     overdue_count = int((df["pm_bucket"] == "Overdue").sum())
     due_soon_count = int((df["pm_bucket"] == "Due Soon").sum())
 
-    c1, c2, c3, c4 = st.columns(4)
-    c1.metric("Stations", total_stations)
-    c2.metric("Total GC", total_analyzers)
-    c3.metric("PM Overdue", overdue_count)
-    c4.metric("PM Due Soon", due_soon_count)
+    # KPI cards
+    st.markdown(f"""
+    <div class="kpi-row">
+      <div class="kpi-card">
+        <div class="kpi-title">Stations</div>
+        <div class="kpi-value">{total_stations}</div>
+        <div class="kpi-sub">Active stations</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-title">Total GC</div>
+        <div class="kpi-value">{total_analyzers}</div>
+        <div class="kpi-sub">All analyzers</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-title">PM Overdue</div>
+        <div class="kpi-value">{overdue_count}</div>
+        <div class="kpi-sub">Needs action</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-title">PM Due Soon</div>
+        <div class="kpi-value">{due_soon_count}</div>
+        <div class="kpi-sub">Next 14 days</div>
+      </div>
+    </div>
+    """, unsafe_allow_html=True)
 
-    # Filters + View options
-    left, right = st.columns([2, 1])
+    # Control bar
+    st.markdown('<div class="control-bar">', unsafe_allow_html=True)
 
-    with left:
-        st.subheader("PM Filters (Stations)")
-        f1, f2, f3 = st.columns(3)
-        if f1.button("Show All", use_container_width=True):
-            st.session_state["station_filter"] = "ALL"
-        if f2.button("🔴 PM Overdue", use_container_width=True):
-            st.session_state["station_filter"] = "OVERDUE"
-        if f3.button("🟠 PM Due Soon", use_container_width=True):
-            st.session_state["station_filter"] = "DUESOON"
-        if "station_filter" not in st.session_state:
-            st.session_state["station_filter"] = "ALL"
+    st.markdown('<div class="control-box">', unsafe_allow_html=True)
+    st.markdown('<div class="small-label">Search</div>', unsafe_allow_html=True)
+    search = st.text_input("", placeholder="Station / Location / Tag", label_visibility="collapsed")
+    st.markdown('</div>', unsafe_allow_html=True)
 
-    with right:
-        st.subheader("View")
+    st.markdown('<div class="control-box">', unsafe_allow_html=True)
+    cols = st.columns([1.2, 1])
+    with cols[0]:
+        st.markdown('<div class="small-label">PM Filter</div>', unsafe_allow_html=True)
+        filter_choice = st.radio(
+            "PM Filter",
+            ["ALL", "OVERDUE", "DUESOON"],
+            index=["ALL", "OVERDUE", "DUESOON"].index(st.session_state.get("station_filter", "ALL")),
+            horizontal=True,
+            label_visibility="collapsed",
+        )
+        st.session_state["station_filter"] = filter_choice
 
-        vrow1 = st.columns(2)
-        vrow2 = st.columns(2)
+    with cols[1]:
+        st.markdown('<div class="small-label">View</div>', unsafe_allow_html=True)
+        view_choice = st.radio(
+            "View",
+            ["LIST", "BIG", "MED", "SMALL"],
+            index=["LIST", "BIG", "MED", "SMALL"].index(st.session_state.get("view_mode", "SMALL")),
+            horizontal=True,
+            label_visibility="collapsed",
+        )
+        st.session_state["view_mode"] = view_choice
 
-        if vrow1[0].button("📋", help="List", use_container_width=True):
-            st.session_state["view_mode"] = "LIST"
-        if vrow1[1].button("🟥", help="Big cards", use_container_width=True):
-            st.session_state["view_mode"] = "BIG"
-        if vrow2[0].button("🟧", help="Medium cards", use_container_width=True):
-            st.session_state["view_mode"] = "MED"
-        if vrow2[1].button("🟨", help="Small cards", use_container_width=True):
-            st.session_state["view_mode"] = "SMALL"
+    st.markdown('</div>', unsafe_allow_html=True)
+    st.markdown('</div>', unsafe_allow_html=True)
 
-        if "view_mode" not in st.session_state:
-            st.session_state["view_mode"] = "SMALL"
-            
     if "selected_station" not in st.session_state:
         st.session_state["selected_station"] = None
 
     if len(df) == 0:
         st.info("No stations yet. Add station pairs first.")
     else:
-        # station-level flags for filters
+        # Search filter for stations
+        station_list = sorted(df["station"].unique().tolist())
+        if search and search.strip():
+            q = search.strip().lower()
+            station_list = [
+                s for s in station_list
+                if q in str(s).lower()
+                or q in str(df[df["station"] == s]["location"].iloc[0]).lower()
+                or q in " ".join(df[df["station"] == s]["tag"].astype(str).tolist()).lower()
+            ]
+
+        # Station-level flags for filters
         stations = []
         for station, g in df.groupby("station"):
+            if station not in station_list:
+                continue
             any_overdue = (g["pm_bucket"] == "Overdue").any()
             any_due_soon = (g["pm_bucket"] == "Due Soon").any()
             stations.append((station, any_overdue, any_due_soon))
         station_df = pd.DataFrame(stations, columns=["station", "any_overdue", "any_due_soon"])
 
-        mode = st.session_state["station_filter"]
+        mode = st.session_state.get("station_filter", "ALL")
         filtered_stations = station_df["station"].tolist()
         if mode == "OVERDUE":
             filtered_stations = station_df[station_df["any_overdue"]]["station"].tolist()
@@ -546,7 +579,7 @@ with tab1:
         filtered_stations = sorted(filtered_stations)
 
         st.caption("Click a station to open full details.")
-        vm = st.session_state["view_mode"]
+        vm = st.session_state.get("view_mode", "SMALL")
         if vm == "LIST":
             render_station_list(df, filtered_stations)
         elif vm == "BIG":
@@ -559,57 +592,53 @@ with tab1:
         # Details panel
         sel = st.session_state.get("selected_station")
         if sel:
-             st.divider()
+            st.divider()
+            with st.expander(f"📌 Station Details — {sel}", expanded=True):
+                if st.button("Close Details", key="close_details"):
+                    st.session_state["selected_station"] = None
+                    st.rerun()
 
-        with st.expander(f"📌 Station Details — {sel}", expanded=True):
-            if st.button("Close Details", key="close_details"):
-                st.session_state["selected_station"] = None
-                st.rerun()
+                sg = df[df["station"] == sel].copy()
+                st.markdown(f"### {station_pm_header_status(sg)}")
 
-            sg = df[df["station"] == sel].copy()
-            st.markdown(f"### {station_pm_header_status(sg)}")
+                duty_df = sg[sg["role"] == "Duty"]
+                standby_df = sg[sg["role"] == "Standby"]
 
-            duty_df = sg[sg["role"] == "Duty"]
-            standby_df = sg[sg["role"] == "Standby"]
+                cols2 = st.columns(2)
 
-            cols = st.columns(2)
+                def render_gc(col, label, role_df, role_name):
+                    with col:
+                        st.markdown(f"#### {label}")
+                        if len(role_df) == 0:
+                            st.warning(f"{role_name} GC not defined.")
+                            return
 
-            def render_gc(col, label, role_df, role_name):
-                with col:
-                    st.markdown(f"#### {label}")
-                    if len(role_df) == 0:
-                        st.warning(f"{role_name} GC not defined.")
-                        return
+                        item = role_df.iloc[0]
+                        aid = int(item["id"])
 
-                    item = role_df.iloc[0]
-                    aid = int(item["id"])
+                        pm_date = item["pm_date"] if pd.notna(item.get("pm_date")) else "-"
+                        pm_by = item["performed_by"] if pd.notna(item.get("performed_by")) else "-"
+                        pm_attach = item.get("attachment_path")
+                        evidence = "📎 Attached" if (pm_attach is not None and pd.notna(pm_attach) and str(pm_attach).strip()) else "⚪ No attachment"
+                        next_due = item["next_pm_due"] if pd.notna(item.get("next_pm_due")) else "-"
 
-                    pm_date = item["pm_date"] if pd.notna(item.get("pm_date")) else "-"
-                    pm_by = item["performed_by"] if pd.notna(item.get("performed_by")) else "-"
-                    pm_attach = item.get("attachment_path")
-                    evidence = "📎 Attached" if (pm_attach is not None and pd.notna(pm_attach) and str(pm_attach).strip()) else "⚪ No attachment"
-                    next_due = item["next_pm_due"] if pd.notna(item.get("next_pm_due")) else "-"
+                        st.write(f"**Tag:** {item['tag']}")
+                        st.write(f"**Status:** {role_name}")
+                        st.write(f"**Last PM Date:** {pm_date}")
+                        st.write(f"**Performed By:** {pm_by}")
+                        st.write(f"**Evidence:** {evidence}")
+                        st.write(f"**Next PM Due:** {next_due}")
 
-                    st.write(f"**Tag:** {item['tag']}")
-                    st.write(f"**Status:** {role_name}")
-                    st.write(f"**Last PM Date:** {pm_date}")
-                    st.write(f"**Performed By:** {pm_by}")
-                    st.write(f"**Evidence:** {evidence}")
-                    st.write(f"**Next PM Due:** {next_due}")
+                        if st.button("📎 PM + Attachment", key=f"pmatt_details_{sel}_{aid}"):
+                            st.session_state["open_attach_for"] = aid
+                            st.rerun()
 
-                    if st.button("📎 PM + Attachment", key=f"pmatt_details_{sel}_{aid}"):
-                        st.session_state["open_attach_for"] = aid
-                        st.rerun()
+                        if pm_attach is not None and pd.notna(pm_attach) and str(pm_attach).strip():
+                            with st.expander("📎 View / Download last PM attachment"):
+                                show_attachment(str(pm_attach), key_prefix=f"details_{sel}_{aid}")
 
-                    if pm_attach is not None and pd.notna(pm_attach) and str(pm_attach).strip():
-                        with st.expander("📎 View / Download last PM attachment"):
-                            show_attachment(str(pm_attach), key_prefix=f"details_{sel}_{aid}")
-
-                        render_gc(cols[0], "GC-01", duty_df, "Duty")
-                        render_gc(cols[1], "GC-02", standby_df, "Standby")
-
-            
-
+                render_gc(cols2[0], "GC-01", duty_df, "Duty")
+                render_gc(cols2[1], "GC-02", standby_df, "Standby")
 
         # Shared PM+Attachment form
         open_for = st.session_state.get("open_attach_for")
@@ -623,10 +652,7 @@ with tab1:
 
             with st.form("attach_form"):
                 st.text_input("GC Tag", value=tag, disabled=True)
-                performed_by = st.text_input(
-                    "Performed by (saved for future)",
-                    value=st.session_state.get("quick_name", "")
-                )
+                performed_by = st.text_input("Performed by (saved for future)", value=st.session_state.get("quick_name", ""))
                 pm_date = st.text_input("PM date (YYYY-MM-DD HH:MM:SS)", value=now_iso())
                 checklist = st.checkbox("PM checklist completion", value=True)
                 notes = st.text_area("Notes", placeholder="Findings / parts changed / WO ref")
@@ -661,7 +687,6 @@ with tab1:
 # -----------------------------
 with tab2:
     st.subheader("Add Station Pair (Duty + Standby)")
-
     with st.form("station_pair_form", clear_on_submit=True):
         station = st.text_input("Station name (unique)", placeholder="e.g., BCS-01")
         location = st.text_input("Location / Area", placeholder="e.g., BCS")
@@ -682,7 +707,6 @@ with tab2:
 # -----------------------------
 with tab_edit:
     st.subheader("Edit Station")
-
     df = fetch_kpis()
     if len(df) == 0:
         st.info("No stations yet.")
@@ -711,7 +735,6 @@ with tab_edit:
             pm_interval_new = st.number_input("PM interval (days)", min_value=1, value=interval_current, step=1)
 
             save = st.form_submit_button("Save Changes")
-
             if save:
                 try:
                     update_station_pair(
