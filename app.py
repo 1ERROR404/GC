@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # app.py (NO-JS + NO-CHARTS: modern + responsive + stable)
 # ✅ PM-only dashboard
 # ✅ Same tags can repeat across stations (GC-01/GC-02 per station)
@@ -46,6 +47,132 @@ button[kind="secondary"], button[kind="primary"] { padding: 0.35rem 0.6rem; }
 }
 
 /* KPI cards */
+=======
+# app.py — Instrumentation Tasks Dashboard (Clean + Fixed)
+# Streamlit + SQLite (via db.py: init_db(), get_conn())
+
+import streamlit as st
+import pandas as pd
+from datetime import datetime, date, timedelta
+from pathlib import Path
+import mimetypes
+from typing import Optional, Tuple
+
+from db import init_db, get_conn
+
+# -----------------------------
+# App config + DB init
+# -----------------------------
+st.set_page_config(page_title="Instrumentation Tasks Dashboard", layout="wide")
+init_db()
+
+UPLOAD_DIR = Path("uploads")
+UPLOAD_DIR.mkdir(exist_ok=True)
+
+# -----------------------------
+# Login (Secrets) - Modern Responsive (no JS)
+# -----------------------------
+# ✅ Replace ONLY your require_login_clean() with this fixed version
+# (This puts the Streamlit form INSIDE the glass card, no extra form above/below)
+
+# ✅ Replace ONLY your require_login_clean() with this version
+# - Glass card becomes the BORDER/WRAPPER around the form
+# - Form is perfectly centered in the page
+# - Inputs are smaller + tighter spacing
+# ✅ Replace ONLY your require_login_clean() with this SIMPLE clean one
+# - No extra/empty cards
+# - No glass wrapper at all
+# - Responsive login form
+# - Positioned at "middle-top" (not center of page)
+# - Inputs look normal (not thin line)
+
+# ✅ Replace ONLY your require_login_clean() with this updated responsive version
+# - Responsive card width + padding
+# - Password field EXACT same size/style as username
+# - No separation (everything inside same card/container)
+def require_login_clean():
+    if st.session_state.get("logged_in"):
+        return
+
+    app_user = st.secrets.get("APP_USER", "sohar")
+    app_pass = st.secrets.get("APP_PASS", "1234")
+
+    # Basic clean styling
+    st.markdown("""
+    <style>
+    header {visibility: hidden;}
+    footer {visibility: hidden;}
+
+    .login-container {
+        max-width: 400px;
+        margin: auto;
+        padding-top: 8vh;
+    }
+
+    .login-title {
+        text-align: center;
+        font-size: 26px;
+        font-weight: 700;
+        margin-bottom: 20px;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
+    # Center container
+    with st.container():
+        st.markdown('<div class="login-container">', unsafe_allow_html=True)
+        st.markdown('<div class="login-title">Login to Dashboard</div>', unsafe_allow_html=True)
+
+        with st.form("login_form"):
+            username = st.text_input("Username")
+            password = st.text_input("Password", type="password")
+            login_btn = st.form_submit_button("Login")
+
+        st.markdown('</div>', unsafe_allow_html=True)
+
+        if login_btn:
+            if username == app_user and password == app_pass:
+                st.session_state["logged_in"] = True
+                st.rerun()
+            else:
+                st.error("Invalid username or password")
+
+    st.stop()
+
+
+
+
+
+
+
+
+require_login_clean()
+
+with st.sidebar:
+    if st.button("Logout"):
+        st.session_state["logged_in"] = False
+        st.rerun()
+
+# -----------------------------
+# UI CSS (mobile friendly)
+# -----------------------------
+st.markdown(
+    """
+<style>
+div[data-testid="stVerticalBlock"] { gap: 0.65rem; }
+section.main > div { padding-top: 1rem; padding-bottom: 1rem; }
+button[kind="secondary"], button[kind="primary"] { padding: 0.35rem 0.6rem; }
+
+@media (max-width: 700px) {
+  html, body, [class*="css"] { font-size: 14px !important; }
+  div[data-testid="column"] { width: 100% !important; flex: 1 1 100% !important; max-width: 100% !important; }
+  div[data-testid="stDataFrame"] { overflow-x: auto; }
+  h1 { font-size: 1.35rem !important; }
+  h2 { font-size: 1.12rem !important; }
+  h3 { font-size: 1.03rem !important; }
+}
+
+>>>>>>> 10e4590 (synce with changes in codes)
 .kpi-row{
   display:flex; gap:12px; justify-content:center; align-items:stretch; flex-wrap:wrap;
   margin: 0.2rem 0 0.8rem 0;
@@ -67,7 +194,10 @@ button[kind="secondary"], button[kind="primary"] { padding: 0.35rem 0.6rem; }
   .kpi-value{ font-size: 1.6rem; }
 }
 
+<<<<<<< HEAD
 /* Control bar */
+=======
+>>>>>>> 10e4590 (synce with changes in codes)
 .control-bar{
   display:flex; gap:12px; flex-wrap:wrap; align-items:flex-end; justify-content:space-between;
   margin: 0.2rem 0 0.6rem 0;
@@ -81,14 +211,21 @@ button[kind="secondary"], button[kind="primary"] { padding: 0.35rem 0.6rem; }
 }
 .small-label{ font-size: 0.78rem; opacity: .7; margin-bottom: 6px; }
 </style>
+<<<<<<< HEAD
 """, unsafe_allow_html=True)
 
 UPLOAD_DIR = Path("uploads")
 UPLOAD_DIR.mkdir(exist_ok=True)
+=======
+""",
+    unsafe_allow_html=True,
+)
+>>>>>>> 10e4590 (synce with changes in codes)
 
 # -----------------------------
 # Helpers
 # -----------------------------
+<<<<<<< HEAD
 def now_iso():
     return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
@@ -126,6 +263,39 @@ def show_attachment(path_str: str | None, key_prefix: str):
         return
 
     p = Path(str(path_str))
+=======
+def safe_str(x, default: str = "-") -> str:
+    if x is None:
+        return default
+    if isinstance(x, float) and pd.isna(x):
+        return default
+    if isinstance(x, str) and not x.strip():
+        return default
+    return str(x)
+
+def is_pm_task(r) -> bool:
+    tt = safe_str(r.get("task_type"), "").strip().lower()
+    return "pm" in tt
+
+def date_leq(a: Optional[date], b: Optional[date]) -> bool:
+    if not a or not b:
+        return False
+    return a <= b
+
+def today_str() -> str:
+    return date.today().strftime("%Y-%m-%d")
+
+def now_iso() -> str:
+    return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+def parse_date(s: Optional[str]) -> Optional[date]:
+    if not s or not str(s).strip():
+        return None
+    return datetime.strptime(str(s), "%Y-%m-%d").date()
+
+def show_attachment(path_str: str, key_prefix: str):
+    p = Path(path_str)
+>>>>>>> 10e4590 (synce with changes in codes)
     if not p.exists():
         st.warning("Attachment file not found on this PC / server.")
         st.code(str(p))
@@ -142,6 +312,7 @@ def show_attachment(path_str: str | None, key_prefix: str):
         data=p.read_bytes(),
         file_name=p.name,
         mime=mime,
+<<<<<<< HEAD
         key=f"dl_{key_prefix}_{p.name}_{p.stat().st_mtime_ns}"
     )
 
@@ -374,12 +545,243 @@ def get_pm_logs(analyzer_id: int):
         ORDER BY pm_date DESC
         LIMIT 50
     """, conn, params=(analyzer_id,))
+=======
+        key=f"dl_{key_prefix}_{p.name}_{p.stat().st_mtime_ns}",
+    )
+
+def kpi_cards(planned: int = 0, done: int = 0, overdue: int = 0, rate: int = 0):
+    st.markdown(
+        f"""
+    <div class="kpi-row">
+      <div class="kpi-card">
+        <div class="kpi-title">Planned</div>
+        <div class="kpi-value">{planned}</div>
+        <div class="kpi-sub">In selected period</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-title">Completed</div>
+        <div class="kpi-value">{done}</div>
+        <div class="kpi-sub">In selected period</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-title">Overdue</div>
+        <div class="kpi-value">{overdue}</div>
+        <div class="kpi-sub">Due date passed</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-title">Completion %</div>
+        <div class="kpi-value">{rate}%</div>
+        <div class="kpi-sub">On-time / Planned</div>
+      </div>
+    </div>
+    """,
+        unsafe_allow_html=True,
+    )
+
+def compute_overdue(row) -> bool:
+    stt = safe_str(row.get("status"), "")
+    if stt in ["Done", "Cancelled"]:
+        return False
+    due = parse_date(row.get("due_date"))
+    if not due:
+        return False
+    return due < date.today()
+
+def period_range(mode: str, any_day: date) -> Tuple[date, date]:
+    # Week = Sun..Sat
+    if mode == "Weekly":
+        days_since_sun = (any_day.weekday() + 1) % 7  # Sunday -> 0
+        start = any_day - timedelta(days=days_since_sun)
+        end = start + timedelta(days=6)
+        return start, end
+
+    start = any_day.replace(day=1)
+    if start.month == 12:
+        next_month = start.replace(year=start.year + 1, month=1, day=1)
+    else:
+        next_month = start.replace(month=start.month + 1, day=1)
+    end = next_month - timedelta(days=1)
+    return start, end
+
+# -----------------------------
+# DB Operations
+# -----------------------------
+def fetch_validations() -> pd.DataFrame:
+    conn = get_conn()
+    df = pd.read_sql_query(
+        """
+        SELECT *
+        FROM validations
+        ORDER BY
+          CASE status
+            WHEN 'Planned' THEN 1
+            WHEN 'In Progress' THEN 2
+            WHEN 'Done' THEN 3
+            WHEN 'Failed' THEN 4
+            WHEN 'Cancelled' THEN 5
+            ELSE 9
+          END,
+          due_date IS NULL, due_date ASC,
+          id DESC
+    """,
+        conn,
+    )
+    conn.close()
+    return df
+
+def insert_validation(payload: dict) -> int:
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute(
+        """
+        INSERT INTO validations
+        (customer_name, validation_type, station, asset_tag, planned_date, due_date,
+         status, result, report_no, notes, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """,
+        (
+            payload["customer_name"],
+            payload["validation_type"],
+            payload.get("station"),
+            payload.get("asset_tag"),
+            payload.get("planned_date"),
+            payload.get("due_date"),
+            payload.get("status", "Planned"),
+            payload.get("result"),
+            payload.get("report_no"),
+            payload.get("notes"),
+            now_iso(),
+            now_iso(),
+        ),
+    )
+    vid = cur.lastrowid
+    conn.commit()
+    conn.close()
+    return int(vid)
+
+def fetch_tasks() -> pd.DataFrame:
+    conn = get_conn()
+    df = pd.read_sql_query(
+        """
+        SELECT *
+        FROM tasks
+        ORDER BY
+          CASE status
+            WHEN 'Planned' THEN 1
+            WHEN 'In Progress' THEN 2
+            WHEN 'On Hold' THEN 3
+            WHEN 'Done' THEN 4
+            WHEN 'Cancelled' THEN 5
+            ELSE 9
+          END,
+          due_date IS NULL, due_date ASC,
+          id DESC
+    """,
+        conn,
+    )
+    conn.close()
+
+    if len(df):
+        df["is_overdue"] = df.apply(compute_overdue, axis=1)
+    else:
+        df["is_overdue"] = False
+    return df
+
+def insert_task(payload: dict) -> int:
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute(
+        """
+        INSERT INTO tasks
+        (wo_number, station, location, department, task_type, asset_tag,
+         planned_date, due_date, status, assigned_to, completed_date, notes, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """,
+        (
+            payload["wo_number"],
+            payload["station"],
+            payload.get("location"),
+            payload["department"],
+            payload["task_type"],
+            payload.get("asset_tag"),
+            payload.get("planned_date"),
+            payload.get("due_date"),
+            payload.get("status", "Planned"),
+            payload.get("assigned_to"),
+            payload.get("completed_date"),
+            payload.get("notes"),
+            now_iso(),
+            now_iso(),
+        ),
+    )
+    task_id = cur.lastrowid
+    conn.commit()
+    conn.close()
+    return int(task_id)
+
+def update_task(task_id: int, payload: dict):
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute(
+        """
+        UPDATE tasks
+        SET wo_number=?, station=?, location=?, department=?, task_type=?, asset_tag=?,
+            planned_date=?, due_date=?, status=?, assigned_to=?, completed_date=?, notes=?, updated_at=?
+        WHERE id=?
+    """,
+        (
+            payload["wo_number"],
+            payload["station"],
+            payload.get("location"),
+            payload["department"],
+            payload["task_type"],
+            payload.get("asset_tag"),
+            payload.get("planned_date"),
+            payload.get("due_date"),
+            payload.get("status", "Planned"),
+            payload.get("assigned_to"),
+            payload.get("completed_date"),
+            payload.get("notes"),
+            now_iso(),
+            task_id,
+        ),
+    )
+    conn.commit()
+    conn.close()
+
+def add_attachment(task_id: int, file_path: str):
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute(
+        """
+        INSERT INTO task_attachments(task_id, file_path, uploaded_at)
+        VALUES (?, ?, ?)
+    """,
+        (task_id, file_path, now_iso()),
+    )
+    conn.commit()
+    conn.close()
+
+def fetch_attachments(task_id: int) -> pd.DataFrame:
+    conn = get_conn()
+    df = pd.read_sql_query(
+        """
+        SELECT id, file_path, uploaded_at
+        FROM task_attachments
+        WHERE task_id=?
+        ORDER BY uploaded_at DESC
+    """,
+        conn,
+        params=(task_id,),
+    )
+>>>>>>> 10e4590 (synce with changes in codes)
     conn.close()
     return df
 
 # -----------------------------
 # UI
 # -----------------------------
+<<<<<<< HEAD
 st.title("GC Analyzer PM Tracking Dashboard")
 
 tab1, tab2, tab_edit, tab3 = st.tabs(["Dashboard", "Add Station Pair", "Edit Station", "Logs & Attachments"])
@@ -506,12 +908,26 @@ with tab1:
       </div>
     </div>
     """, unsafe_allow_html=True)
+=======
+st.title("Instrumentation Tasks Dashboard")
+
+tab1, tab2, tab3, tab4 = st.tabs(
+    ["Overview (KPI)", "Add / Edit Tasks", "Attachments", "Validation"]
+)
+
+# -----------------------------
+# Tab 1: Overview KPI
+# -----------------------------
+with tab1:
+    df = fetch_tasks()
+>>>>>>> 10e4590 (synce with changes in codes)
 
     # Control bar
     st.markdown('<div class="control-bar">', unsafe_allow_html=True)
 
     st.markdown('<div class="control-box">', unsafe_allow_html=True)
     st.markdown('<div class="small-label">Search</div>', unsafe_allow_html=True)
+<<<<<<< HEAD
     search = st.text_input("", placeholder="Station / Location / Tag", label_visibility="collapsed")
     st.markdown('</div>', unsafe_allow_html=True)
 
@@ -813,3 +1229,523 @@ with tab3:
                         st.rerun()
                     except Exception:
                         st.error("Invalid timestamp format.")
+=======
+    q = st.text_input(
+        "Search",
+        placeholder="WO / Station / Tag / Assigned / Type",
+        label_visibility="collapsed",
+        key="kpi_search",
+    )
+    st.markdown("</div>", unsafe_allow_html=True)
+
+    st.markdown('<div class="control-box">', unsafe_allow_html=True)
+    c1, c2 = st.columns(2)
+    with c1:
+        st.markdown('<div class="small-label">KPI Mode</div>', unsafe_allow_html=True)
+        mode = st.radio("mode", ["Weekly", "Monthly"], horizontal=True, label_visibility="collapsed")
+    with c2:
+        st.markdown('<div class="small-label">Pick date inside period</div>', unsafe_allow_html=True)
+        anchor = st.date_input("anchor", value=date.today(), label_visibility="collapsed")
+    st.markdown("</div>", unsafe_allow_html=True)
+
+    st.markdown("</div>", unsafe_allow_html=True)
+
+    # Filters
+    if len(df):
+        departments = ["ALL"] + sorted(df["department"].dropna().unique().tolist())
+        statuses = ["ALL", "Planned", "In Progress", "Done", "On Hold", "Cancelled"]
+        types = ["ALL"] + sorted(df["task_type"].dropna().unique().tolist())
+    else:
+        departments, statuses, types = ["ALL"], ["ALL"], ["ALL"]
+
+    f1, f2, f3 = st.columns(3)
+    dep = f1.selectbox("Department", departments, key="kpi_dep")
+    stt = f2.selectbox("Status", statuses, key="kpi_status")
+    ttype = f3.selectbox("Task type", types, key="kpi_type")
+
+    # Apply filters
+    view = df.copy()
+
+    if q and q.strip() and len(view):
+        s = q.strip().lower()
+
+        def _hit(r):
+            txt = " ".join(
+                [
+                    safe_str(r.get("wo_number")),
+                    safe_str(r.get("station")),
+                    safe_str(r.get("location")),
+                    safe_str(r.get("department")),
+                    safe_str(r.get("task_type")),
+                    safe_str(r.get("asset_tag")),
+                    safe_str(r.get("assigned_to")),
+                    safe_str(r.get("notes")),
+                ]
+            ).lower()
+            return s in txt
+
+        view = view[view.apply(_hit, axis=1)]
+
+    if dep != "ALL" and len(view):
+        view = view[view["department"] == dep]
+    if stt != "ALL" and len(view):
+        view = view[view["status"] == stt]
+    if ttype != "ALL" and len(view):
+        view = view[view["task_type"] == ttype]
+
+    start, end = period_range(mode, anchor)
+
+    # PM-only toggle
+    pm_only = st.checkbox("PM tasks only", value=True, key="kpi_pm_only")
+
+    kpi_df = view.copy()
+    if pm_only and len(kpi_df):
+        kpi_df = kpi_df[kpi_df.apply(is_pm_task, axis=1)]
+
+    def in_period(d: Optional[date]) -> bool:
+        return bool(d and start <= d <= end)
+
+    # Planned = due_date in period (PM compliance)
+    planned = 0
+    done = 0
+    on_time = 0
+    backlog = 0
+    overdue = int(kpi_df["is_overdue"].sum()) if len(kpi_df) else 0
+
+    if len(kpi_df):
+        planned_mask = kpi_df.apply(lambda r: in_period(parse_date(r.get("due_date"))), axis=1).astype(bool)
+        planned = int(planned_mask.to_numpy().sum())
+
+        done_mask = kpi_df.apply(
+            lambda r: (r.get("status") == "Done") and in_period(parse_date(r.get("completed_date"))),
+            axis=1,
+        ).astype(bool)
+        done = int(done_mask.to_numpy().sum())
+
+        on_time_mask = kpi_df.apply(
+            lambda r: (r.get("status") == "Done")
+                      and in_period(parse_date(r.get("completed_date")))
+                      and date_leq(parse_date(r.get("completed_date")), parse_date(r.get("due_date"))),
+            axis=1,
+        ).astype(bool)
+        on_time = int(on_time_mask.to_numpy().sum())
+
+        backlog_mask = kpi_df.apply(
+            lambda r: (r.get("status") not in ["Done", "Cancelled"])
+                      and (parse_date(r.get("due_date")) is not None)
+                      and (parse_date(r.get("due_date")) < start),
+            axis=1,
+        ).astype(bool)
+        backlog = int(backlog_mask.to_numpy().sum())
+
+    compliance = int(round((on_time / planned) * 100, 0)) if planned > 0 else 0
+
+    st.caption(f"Period: {start.strftime('%Y-%m-%d')} → {end.strftime('%Y-%m-%d')}")
+    kpi_cards(planned=planned, done=done, overdue=overdue, rate=compliance)
+
+    # Extra KPI row (Backlog + On-time count)
+    st.markdown(
+        f"""
+    <div class="kpi-row">
+      <div class="kpi-card">
+        <div class="kpi-title">On-Time Completed</div>
+        <div class="kpi-value">{on_time}</div>
+        <div class="kpi-sub">Completed ≤ Due Date</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-title">Backlog</div>
+        <div class="kpi-value">{backlog}</div>
+        <div class="kpi-sub">Due before period</div>
+      </div>
+    </div>
+    """,
+        unsafe_allow_html=True,
+    )
+
+    # Compliance breakdown
+    st.subheader("PM Compliance breakdown")
+    if len(kpi_df):
+        tmp = kpi_df.copy()
+        tmp["due_dt"] = tmp["due_date"].apply(parse_date)
+        tmp["comp_dt"] = tmp["completed_date"].apply(parse_date)
+
+        tmp_period = tmp[tmp["due_dt"].apply(lambda d: in_period(d))]
+        if len(tmp_period):
+            tmp_period = tmp_period.copy()
+            tmp_period["planned_pm"] = 1
+            tmp_period["done_ontime"] = tmp_period.apply(
+                lambda r: 1
+                if (
+                    r.get("status") == "Done"
+                    and r["comp_dt"]
+                    and r["due_dt"]
+                    and r["comp_dt"] <= r["due_dt"]
+                )
+                else 0,
+                axis=1,
+            )
+            g = (
+                tmp_period.groupby(["department", "station"], dropna=False)[["planned_pm", "done_ontime"]]
+                .sum()
+                .reset_index()
+            )
+            g["compliance_%"] = (g["done_ontime"] / g["planned_pm"] * 100).round(0).astype(int)
+            g = g.sort_values(["compliance_%", "planned_pm"], ascending=[True, False])
+            st.dataframe(g, use_container_width=True, hide_index=True)
+        else:
+            st.info("No PM planned in this period.")
+    else:
+        st.info("No tasks.")
+
+    # Overdue / Due Soon (ALWAYS visible, not inside wrong else)
+    st.subheader("Overdue / Due Soon")
+    soon_days = 14
+
+    def due_days_left(r):
+        if r.get("status") in ["Done", "Cancelled"]:
+            return None
+        dd = parse_date(r.get("due_date"))
+        if not dd:
+            return None
+        return (dd - date.today()).days
+
+    if len(view):
+        tmp2 = view.copy()
+        tmp2["due_in_days"] = tmp2.apply(due_days_left, axis=1)
+
+        def bucket(d):
+            if d is None:
+                return 9
+            if d < 0:
+                return 1
+            if d <= soon_days:
+                return 2
+            return 3
+
+        tmp2["bucket"] = tmp2["due_in_days"].apply(bucket)
+        tmp2 = tmp2.sort_values(["bucket", "due_in_days"], ascending=[True, True])
+
+        show_cols = [
+            "wo_number",
+            "station",
+            "location",
+            "department",
+            "task_type",
+            "asset_tag",
+            "status",
+            "assigned_to",
+            "planned_date",
+            "due_date",
+            "completed_date",
+            "due_in_days",
+        ]
+        st.dataframe(tmp2[show_cols], use_container_width=True, hide_index=True)
+    else:
+        st.info("No tasks to show.")
+
+# -----------------------------
+# Tab 2: Add / Edit
+# -----------------------------
+with tab2:
+    st.subheader("Add New Task (Work Order based)")
+    with st.form("add_task_form", clear_on_submit=True):
+        c1, c2, c3 = st.columns(3)
+        wo = c1.text_input("Work Order Number (WO)", placeholder="e.g., 4500xxxxx")
+        station = c2.text_input("Station", placeholder="e.g., BCS-01")
+        location = c3.text_input("Location / Area", placeholder="e.g., BCS")
+
+        c4, c5, c6 = st.columns(3)
+        department = c4.selectbox(
+            "Department",
+            ["Instrument", "Electrical", "Mechanical", "Network", "Facility", "Operation"],
+        )
+        task_type = c5.text_input("Task Type", placeholder="e.g., PM / Calibration / F&G")
+        asset_tag = c6.text_input("Asset Tag (optional)", placeholder="e.g., PT-101 / GC-01 / FGD-22")
+
+        c7, c8, c9 = st.columns(3)
+        planned_date_val = c7.date_input("Planned Date", value=date.today())
+        due_date_val = c8.date_input("Due Date", value=date.today())
+        status = c9.selectbox("Status", ["Planned", "In Progress", "Done", "On Hold", "Cancelled"])
+
+        assigned_to = st.text_input("Assigned To", placeholder="e.g., Omar")
+        completed_date = st.text_input(
+            "Completed Date (YYYY-MM-DD)",
+            value="" if status != "Done" else today_str(),
+        )
+        notes = st.text_area("Notes")
+
+        submit = st.form_submit_button("Save Task")
+
+        if submit:
+            if not wo.strip() or not station.strip() or not task_type.strip():
+                st.error("WO Number, Station, and Task Type are required.")
+                st.stop()
+
+            # Validate completed_date
+            if completed_date.strip():
+                try:
+                    parse_date(completed_date.strip())
+                except Exception:
+                    st.error("Completed Date format must be YYYY-MM-DD")
+                    st.stop()
+
+            task_id = insert_task(
+                {
+                    "wo_number": wo.strip(),
+                    "station": station.strip(),
+                    "location": location.strip() if location.strip() else None,
+                    "department": department,
+                    "task_type": task_type.strip(),
+                    "asset_tag": asset_tag.strip() if asset_tag.strip() else None,
+                    "planned_date": planned_date_val.strftime("%Y-%m-%d"),
+                    "due_date": due_date_val.strftime("%Y-%m-%d"),
+                    "status": status,
+                    "assigned_to": assigned_to.strip() if assigned_to.strip() else None,
+                    "completed_date": completed_date.strip() if completed_date.strip() else None,
+                    "notes": notes.strip() if notes.strip() else None,
+                }
+            )
+            st.success(f"Saved. Task ID: {task_id}")
+            st.rerun()
+
+    st.divider()
+    st.subheader("Edit Existing Task")
+
+    df2 = fetch_tasks()
+    if len(df2) == 0:
+        st.info("No tasks yet.")
+    else:
+        df2 = df2.copy()
+        df2["display"] = df2.apply(
+            lambda r: f"ID:{r['id']} | WO:{r['wo_number']} | {r['station']} | {r['task_type']} | {r['status']}",
+            axis=1,
+        )
+        pick = st.selectbox("Pick task", df2["display"].tolist(), key="edit_pick")
+        row = df2[df2["display"] == pick].iloc[0]
+        task_id = int(row["id"])
+
+        with st.form("edit_task_form"):
+            c1, c2, c3 = st.columns(3)
+            wo = c1.text_input("WO", value=safe_str(row.get("wo_number"), ""))
+            station = c2.text_input("Station", value=safe_str(row.get("station"), ""))
+            location = c3.text_input("Location", value=safe_str(row.get("location"), ""))
+
+            c4, c5, c6 = st.columns(3)
+            department = c4.text_input("Department", value=safe_str(row.get("department"), "Instrument"))
+            task_type = c5.text_input("Task Type", value=safe_str(row.get("task_type"), ""))
+            asset_tag = c6.text_input("Asset Tag", value=safe_str(row.get("asset_tag"), ""))
+
+            c7, c8, c9 = st.columns(3)
+            planned_date = c7.text_input("Planned Date (YYYY-MM-DD)", value=safe_str(row.get("planned_date"), ""))
+            due_date = c8.text_input("Due Date (YYYY-MM-DD)", value=safe_str(row.get("due_date"), ""))
+
+            status_list = ["Planned", "In Progress", "Done", "On Hold", "Cancelled"]
+            current_status = safe_str(row.get("status"), "Planned")
+            status_idx = status_list.index(current_status) if current_status in status_list else 0
+            status = c9.selectbox("Status", status_list, index=status_idx)
+
+            assigned_to = st.text_input("Assigned To", value=safe_str(row.get("assigned_to"), ""))
+            completed_date = st.text_input("Completed Date (YYYY-MM-DD)", value=safe_str(row.get("completed_date"), ""))
+            notes = st.text_area("Notes", value=safe_str(row.get("notes"), ""))
+
+            save = st.form_submit_button("Save Changes")
+            if save:
+                if not wo.strip() or not station.strip() or not task_type.strip():
+                    st.error("WO, Station, Task Type are required.")
+                    st.stop()
+
+                try:
+                    if planned_date.strip():
+                        parse_date(planned_date.strip())
+                    if due_date.strip():
+                        parse_date(due_date.strip())
+                    if completed_date.strip():
+                        parse_date(completed_date.strip())
+                except Exception:
+                    st.error("Date format must be YYYY-MM-DD")
+                    st.stop()
+
+                update_task(
+                    task_id,
+                    {
+                        "wo_number": wo.strip(),
+                        "station": station.strip(),
+                        "location": location.strip() if location.strip() else None,
+                        "department": department.strip(),
+                        "task_type": task_type.strip(),
+                        "asset_tag": asset_tag.strip() if asset_tag.strip() else None,
+                        "planned_date": planned_date.strip() if planned_date.strip() else None,
+                        "due_date": due_date.strip() if due_date.strip() else None,
+                        "status": status,
+                        "assigned_to": assigned_to.strip() if assigned_to.strip() else None,
+                        "completed_date": completed_date.strip() if completed_date.strip() else None,
+                        "notes": notes.strip() if notes.strip() else None,
+                    },
+                )
+                st.success("Updated.")
+                st.rerun()
+
+# -----------------------------
+# Tab 3: Attachments
+# -----------------------------
+with tab3:
+    df3 = fetch_tasks()
+    if len(df3) == 0:
+        st.info("Add tasks first.")
+    else:
+        df3 = df3.copy()
+        df3["display"] = df3.apply(
+            lambda r: f"ID:{r['id']} | WO:{r['wo_number']} | {r['station']} | {r['task_type']}",
+            axis=1,
+        )
+        pick = st.selectbox("Pick task", df3["display"].tolist(), key="att_pick")
+        row = df3[df3["display"] == pick].iloc[0]
+        task_id = int(row["id"])
+
+        st.write(
+            f"**Task:** ID {task_id} | WO {row['wo_number']} | {row['station']} | "
+            f"{row['task_type']} | {row['status']}"
+        )
+
+        st.subheader("Upload attachment")
+        with st.form("upload_attach"):
+            file = st.file_uploader("Attachment (photo/pdf/etc.)", type=None)
+            ok = st.form_submit_button("Upload")
+            if ok:
+                if file is None:
+                    st.error("Please choose a file.")
+                else:
+                    safe_name = f"task{task_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{file.name}"
+                    dest = UPLOAD_DIR / safe_name
+                    dest.write_bytes(file.getbuffer())
+                    add_attachment(task_id, str(dest))
+                    st.success("Uploaded.")
+                    st.rerun()
+
+        st.divider()
+        st.subheader("Attachments list")
+        att = fetch_attachments(task_id)
+        if len(att) == 0:
+            st.info("No attachments yet.")
+        else:
+            for i, rr in att.iterrows():
+                path = rr["file_path"]
+                with st.expander(f"📎 {rr['uploaded_at']} — {Path(path).name}"):
+                    show_attachment(path, key_prefix=f"t{task_id}_{i}")
+
+# -----------------------------
+# Tab 4: Validation
+# -----------------------------
+with tab4:
+    st.subheader("Validation Dashboard")
+
+    vdf = fetch_validations()
+    if len(vdf) == 0:
+        st.info("No validations yet. Add first below.")
+    else:
+        c1, c2, c3 = st.columns(3)
+        vtype = c1.selectbox("Validation Type", ["ALL", "FMS", "GC", "PRT"], key="v_type")
+        cust = c2.selectbox(
+            "Customer",
+            ["ALL"] + sorted(vdf["customer_name"].dropna().unique().tolist()),
+            key="v_cust",
+        )
+        vstatus = c3.selectbox(
+            "Status",
+            ["ALL", "Planned", "In Progress", "Done", "Failed", "Cancelled"],
+            key="v_status",
+        )
+
+        viewv = vdf.copy()
+        if vtype != "ALL":
+            viewv = viewv[viewv["validation_type"] == vtype]
+        if cust != "ALL":
+            viewv = viewv[viewv["customer_name"] == cust]
+        if vstatus != "ALL":
+            viewv = viewv[viewv["status"] == vstatus]
+
+        planned_v = int((viewv["status"].isin(["Planned", "In Progress"])).sum())
+        done_v = int((viewv["status"] == "Done").sum())
+        failed_v = int((viewv["status"] == "Failed").sum())
+
+        def is_overdue_val(r):
+            if r.get("status") in ["Done", "Cancelled"]:
+                return False
+            dd = parse_date(r.get("due_date"))
+            return bool(dd and dd < date.today())
+
+        viewv = viewv.copy()
+        viewv["is_overdue"] = viewv.apply(is_overdue_val, axis=1)
+        overdue_v = int(viewv["is_overdue"].sum())
+
+        st.markdown(
+            f"""
+        <div class="kpi-row">
+          <div class="kpi-card"><div class="kpi-title">Open</div><div class="kpi-value">{planned_v}</div><div class="kpi-sub">Planned + In Progress</div></div>
+          <div class="kpi-card"><div class="kpi-title">Done</div><div class="kpi-value">{done_v}</div><div class="kpi-sub">Completed</div></div>
+          <div class="kpi-card"><div class="kpi-title">Failed</div><div class="kpi-value">{failed_v}</div><div class="kpi-sub">Requires action</div></div>
+          <div class="kpi-card"><div class="kpi-title">Overdue</div><div class="kpi-value">{overdue_v}</div><div class="kpi-sub">Past due date</div></div>
+        </div>
+        """,
+            unsafe_allow_html=True,
+        )
+
+        st.subheader("List")
+        show_cols = [
+            "customer_name",
+            "validation_type",
+            "station",
+            "asset_tag",
+            "planned_date",
+            "due_date",
+            "status",
+            "result",
+            "report_no",
+            "notes",
+        ]
+        st.dataframe(viewv[show_cols], use_container_width=True, hide_index=True)
+
+    st.divider()
+    st.subheader("Add New Validation (FMS / GC / PRT)")
+
+    with st.form("add_validation_form", clear_on_submit=True):
+        c1, c2, c3 = st.columns(3)
+        customer_name = c1.text_input("Customer Name", placeholder="e.g., Customer A")
+        validation_type = c2.selectbox("Validation Type", ["FMS", "GC", "PRT"])
+        station = c3.text_input("Station", placeholder="e.g., BCS-01")
+
+        c4, c5, c6 = st.columns(3)
+        asset_tag = c4.text_input("Asset Tag", placeholder="optional")
+        planned_date = c5.date_input("Planned Date", value=date.today())
+        due_date = c6.date_input("Due Date", value=date.today())
+
+        c7, c8, c9 = st.columns(3)
+        status = c7.selectbox("Status", ["Planned", "In Progress", "Done", "Failed", "Cancelled"])
+        result = c8.selectbox("Result", ["NA", "Pass", "Fail"])
+        report_no = c9.text_input("Report No", placeholder="optional")
+
+        notes = st.text_area("Notes")
+
+        save_val = st.form_submit_button("Save Validation")
+        if save_val:
+            if not customer_name.strip():
+                st.error("Customer Name is required.")
+                st.stop()
+
+            insert_validation(
+                {
+                    "customer_name": customer_name.strip(),
+                    "validation_type": validation_type,
+                    "station": station.strip() if station.strip() else None,
+                    "asset_tag": asset_tag.strip() if asset_tag.strip() else None,
+                    "planned_date": planned_date.strftime("%Y-%m-%d") if planned_date else None,
+                    "due_date": due_date.strftime("%Y-%m-%d") if due_date else None,
+                    "status": status,
+                    "result": result,
+                    "report_no": report_no.strip() if report_no.strip() else None,
+                    "notes": notes.strip() if notes.strip() else None,
+                }
+            )
+            st.success("Saved.")
+            st.rerun()
+>>>>>>> 10e4590 (synce with changes in codes)

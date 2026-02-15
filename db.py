@@ -1,11 +1,16 @@
+<<<<<<< HEAD
 # db.py (UPDATED for repeating tags across stations)
 # - tag is NOT unique
 # - Enforces UNIQUE(station, role) so each station has only 1 Duty + 1 Standby
 # - Safe migration from old analyzers table (where tag was UNIQUE)
+=======
+# db.py (Tasks + Validation DB)
+>>>>>>> 10e4590 (synce with changes in codes)
 
 import sqlite3
 from pathlib import Path
 
+<<<<<<< HEAD
 DB_PATH = Path("gc_dashboard.db")
 
 
@@ -27,10 +32,21 @@ def _col_exists(conn, table: str, col: str) -> bool:
     return any(r["name"] == col for r in cur.fetchall())
 
 
+=======
+DB_PATH = Path("tasks.db")
+
+def get_conn():
+    conn = sqlite3.connect(DB_PATH, check_same_thread=False)
+    conn.execute("PRAGMA foreign_keys = ON;")
+    return conn
+
+
+>>>>>>> 10e4590 (synce with changes in codes)
 def init_db():
     conn = get_conn()
     cur = conn.cursor()
 
+<<<<<<< HEAD
     # -------------------------
     # Create/keep other tables
     # -------------------------
@@ -152,3 +168,84 @@ def init_db():
 
     finally:
         conn.close()
+=======
+    # ------------------------
+    # Tasks Table
+    # ------------------------
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS tasks (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        wo_number TEXT NOT NULL,
+        station TEXT NOT NULL,
+        location TEXT,
+        department TEXT NOT NULL,
+        task_type TEXT NOT NULL,
+        asset_tag TEXT,
+        planned_date TEXT,
+        due_date TEXT,
+        status TEXT NOT NULL DEFAULT 'Planned',
+        assigned_to TEXT,
+        completed_date TEXT,
+        notes TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+    );
+    """)
+
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_tasks_wo ON tasks(wo_number);")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_tasks_due ON tasks(due_date);")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_tasks_station ON tasks(station);")
+
+    # ------------------------
+    # Attachments Table
+    # ------------------------
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS task_attachments (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        task_id INTEGER NOT NULL,
+        file_path TEXT NOT NULL,
+        uploaded_at TEXT NOT NULL,
+        FOREIGN KEY(task_id) REFERENCES tasks(id) ON DELETE CASCADE
+    );
+    """)
+
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_attach_task ON task_attachments(task_id);")
+
+    # ------------------------
+    # Customers Table
+    # ------------------------
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS customers (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        customer_name TEXT NOT NULL UNIQUE
+    );
+    """)
+
+    # ------------------------
+    # Validations Table
+    # ------------------------
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS validations (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        customer_name TEXT NOT NULL,
+        validation_type TEXT NOT NULL,
+        station TEXT,
+        asset_tag TEXT,
+        planned_date TEXT,
+        due_date TEXT,
+        status TEXT NOT NULL DEFAULT 'Planned',
+        result TEXT,
+        report_no TEXT,
+        notes TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+    );
+    """)
+
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_val_customer ON validations(customer_name);")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_val_type ON validations(validation_type);")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_val_due ON validations(due_date);")
+
+    conn.commit()
+    conn.close()
+>>>>>>> 10e4590 (synce with changes in codes)
