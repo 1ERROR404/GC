@@ -1,59 +1,16 @@
-<<<<<<< HEAD
-# app.py (NO-JS + NO-CHARTS: modern + responsive + stable)
-# ✅ PM-only dashboard
-# ✅ Same tags can repeat across stations (GC-01/GC-02 per station)
-# ✅ Dashboard view modes: List | Big cards | Medium cards | Small cards
-# ✅ Click station => Full details panel
-# ✅ Add Station Pair (add-only)
-# ✅ Edit Station tab
-# ✅ Attachments upload + view/download
-# ✅ Mobile friendly CSS
+# app.py (GC Analyzer PM Dashboard + Work Orders Compliance + Weekly Planner)
 # ✅ NO JavaScript
 # ✅ NO Charts
+# ✅ Mobile friendly
+# ✅ Stations: Duty + Standby
+# ✅ PM logs + attachments
+# ✅ Work Orders + Weekly/Monthly Compliance (based on DUE DATE from SAP / manual)
+# ✅ Weekly Planner (PRIVATE): stores your plan in wo_plans (does NOT change SAP due dates)
+# ✅ Manpower assign: Manual + Auto, supports 1 or 2 tech per WO
 
 import streamlit as st
 import pandas as pd
-from datetime import datetime, timedelta
-from pathlib import Path
-import mimetypes
-
-from db import init_db, get_conn
-
-st.set_page_config(page_title="GC Analyzer PM Dashboard", layout="wide")
-init_db()
-
-# ---- Mobile-friendly + responsive UI tweaks ----
-st.markdown("""
-<style>
-/* Overall spacing */
-div[data-testid="stVerticalBlock"] { gap: 0.65rem; }
-section.main > div { padding-top: 1rem; padding-bottom: 1rem; }
-
-/* Buttons */
-button[kind="secondary"], button[kind="primary"] { padding: 0.35rem 0.6rem; }
-
-/* Mobile adjustments */
-@media (max-width: 700px) {
-  html, body, [class*="css"] { font-size: 14px !important; }
-  div[data-testid="column"] {
-    width: 100% !important;
-    flex: 1 1 100% !important;
-    max-width: 100% !important;
-  }
-  div[data-testid="stDataFrame"] { overflow-x: auto; }
-  h1 { font-size: 1.4rem !important; }
-  h2 { font-size: 1.15rem !important; }
-  h3 { font-size: 1.05rem !important; }
-}
-
-/* KPI cards */
-=======
-# app.py — Instrumentation Tasks Dashboard (Clean + Fixed)
-# Streamlit + SQLite (via db.py: init_db(), get_conn())
-
-import streamlit as st
-import pandas as pd
-from datetime import datetime, date, timedelta
+from datetime import datetime, timedelta, date
 from pathlib import Path
 import mimetypes
 from typing import Optional, Tuple
@@ -63,89 +20,58 @@ from db import init_db, get_conn
 # -----------------------------
 # App config + DB init
 # -----------------------------
-st.set_page_config(page_title="Instrumentation Tasks Dashboard", layout="wide")
+st.set_page_config(page_title="GC Analyzer PM Dashboard", layout="wide")
 init_db()
 
+# Upload folder (you can change this to OneDrive later)
 UPLOAD_DIR = Path("uploads")
-UPLOAD_DIR.mkdir(exist_ok=True)
+UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+
 
 # -----------------------------
-# Login (Secrets) - Modern Responsive (no JS)
+# (Optional) Simple Login
 # -----------------------------
-# ✅ Replace ONLY your require_login_clean() with this fixed version
-# (This puts the Streamlit form INSIDE the glass card, no extra form above/below)
-
-# ✅ Replace ONLY your require_login_clean() with this version
-# - Glass card becomes the BORDER/WRAPPER around the form
-# - Form is perfectly centered in the page
-# - Inputs are smaller + tighter spacing
-# ✅ Replace ONLY your require_login_clean() with this SIMPLE clean one
-# - No extra/empty cards
-# - No glass wrapper at all
-# - Responsive login form
-# - Positioned at "middle-top" (not center of page)
-# - Inputs look normal (not thin line)
-
-# ✅ Replace ONLY your require_login_clean() with this updated responsive version
-# - Responsive card width + padding
-# - Password field EXACT same size/style as username
-# - No separation (everything inside same card/container)
 def require_login_clean():
+    # If you don't want login for now, comment out require_login_clean() call below.
     if st.session_state.get("logged_in"):
         return
 
-    app_user = st.secrets.get("APP_USER", "sohar")
+    app_user = st.secrets.get("APP_USER", "demo")
     app_pass = st.secrets.get("APP_PASS", "1234")
 
-    # Basic clean styling
-    st.markdown("""
-    <style>
-    header {visibility: hidden;}
-    footer {visibility: hidden;}
+    st.markdown(
+        """
+        <style>
+        header {visibility: hidden;}
+        footer {visibility: hidden;}
+        .login-container {max-width: 420px; margin: auto; padding-top: 8vh;}
+        .login-title {text-align: center; font-size: 26px; font-weight: 800; margin-bottom: 18px;}
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
 
-    .login-container {
-        max-width: 400px;
-        margin: auto;
-        padding-top: 8vh;
-    }
+    st.markdown('<div class="login-container">', unsafe_allow_html=True)
+    st.markdown('<div class="login-title">Login to Dashboard</div>', unsafe_allow_html=True)
 
-    .login-title {
-        text-align: center;
-        font-size: 26px;
-        font-weight: 700;
-        margin-bottom: 20px;
-    }
-    </style>
-    """, unsafe_allow_html=True)
+    with st.form("login_form"):
+        username = st.text_input("Username")
+        password = st.text_input("Password", type="password")
+        login_btn = st.form_submit_button("Login")
 
-    # Center container
-    with st.container():
-        st.markdown('<div class="login-container">', unsafe_allow_html=True)
-        st.markdown('<div class="login-title">Login to Dashboard</div>', unsafe_allow_html=True)
+    st.markdown("</div>", unsafe_allow_html=True)
 
-        with st.form("login_form"):
-            username = st.text_input("Username")
-            password = st.text_input("Password", type="password")
-            login_btn = st.form_submit_button("Login")
-
-        st.markdown('</div>', unsafe_allow_html=True)
-
-        if login_btn:
-            if username == app_user and password == app_pass:
-                st.session_state["logged_in"] = True
-                st.rerun()
-            else:
-                st.error("Invalid username or password")
+    if login_btn:
+        if username == app_user and password == app_pass:
+            st.session_state["logged_in"] = True
+            st.rerun()
+        else:
+            st.error("Invalid username or password")
 
     st.stop()
 
 
-
-
-
-
-
-
+# Enable login (comment this if you want no login)
 require_login_clean()
 
 with st.sidebar:
@@ -153,12 +79,42 @@ with st.sidebar:
         st.session_state["logged_in"] = False
         st.rerun()
 
+
 # -----------------------------
 # UI CSS (mobile friendly)
 # -----------------------------
 st.markdown(
     """
 <style>
+.badge{
+  display:inline-block; padding:2px 10px; border-radius:999px;
+  font-size: 0.78rem; border:1px solid rgba(255,255,255,0.10);
+  background: rgba(255,255,255,0.05); opacity: 0.95;
+}
+.badge-done { background: rgba(46, 204, 113, 0.15); border-color: rgba(46, 204, 113, 0.35); }
+.badge-plan { background: rgba(52, 152, 219, 0.15); border-color: rgba(52, 152, 219, 0.35); }
+.badge-prog { background: rgba(241, 196, 15, 0.15); border-color: rgba(241, 196, 15, 0.35); }
+.badge-over { background: rgba(231, 76, 60, 0.15); border-color: rgba(231, 76, 60, 0.35); }
+.badge-auto { background: rgba(155, 89, 182, 0.15); border-color: rgba(155, 89, 182, 0.35); }
+
+.card{
+  background: rgba(255,255,255,0.035);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 16px;
+  padding: 12px 12px;
+  box-shadow: 0 10px 26px rgba(0,0,0,0.10);
+  margin-bottom: 10px;
+}
+.card-title{ font-weight: 750; font-size: 0.98rem; margin-bottom: 6px; }
+.card-sub{ font-size: 0.82rem; opacity: 0.80; line-height: 1.35; }
+
+.day-col-title{ font-weight: 800; margin: 0 0 8px 0; }
+.day-chip{ font-size: 0.80rem; opacity: 0.85; margin-left: 6px; }
+
+@media (max-width: 700px){
+  .card-title { font-size: 0.95rem; }
+  .card-sub { font-size: 0.80rem; }
+}
 div[data-testid="stVerticalBlock"] { gap: 0.65rem; }
 section.main > div { padding-top: 1rem; padding-bottom: 1rem; }
 button[kind="secondary"], button[kind="primary"] { padding: 0.35rem 0.6rem; }
@@ -172,7 +128,7 @@ button[kind="secondary"], button[kind="primary"] { padding: 0.35rem 0.6rem; }
   h3 { font-size: 1.03rem !important; }
 }
 
->>>>>>> 10e4590 (synce with changes in codes)
+/* KPI cards */
 .kpi-row{
   display:flex; gap:12px; justify-content:center; align-items:stretch; flex-wrap:wrap;
   margin: 0.2rem 0 0.8rem 0;
@@ -194,10 +150,7 @@ button[kind="secondary"], button[kind="primary"] { padding: 0.35rem 0.6rem; }
   .kpi-value{ font-size: 1.6rem; }
 }
 
-<<<<<<< HEAD
 /* Control bar */
-=======
->>>>>>> 10e4590 (synce with changes in codes)
 .control-bar{
   display:flex; gap:12px; flex-wrap:wrap; align-items:flex-end; justify-content:space-between;
   margin: 0.2rem 0 0.6rem 0;
@@ -207,63 +160,64 @@ button[kind="secondary"], button[kind="primary"] { padding: 0.35rem 0.6rem; }
   border: 1px solid rgba(255,255,255,0.08);
   border-radius: 14px;
   padding: 10px 12px;
-  flex: 1 1 360px;
+  flex: 1 1 260px;
 }
 .small-label{ font-size: 0.78rem; opacity: .7; margin-bottom: 6px; }
 </style>
-<<<<<<< HEAD
-""", unsafe_allow_html=True)
-
-UPLOAD_DIR = Path("uploads")
-UPLOAD_DIR.mkdir(exist_ok=True)
-=======
 """,
     unsafe_allow_html=True,
 )
->>>>>>> 10e4590 (synce with changes in codes)
 
 # -----------------------------
 # Helpers
 # -----------------------------
-<<<<<<< HEAD
-def now_iso():
+def add_wo_update(wo_id: int, action: str, performed_by: str, checklist_complete: bool,
+                  notes: Optional[str], attachment_path: Optional[str]):
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute("""
+        INSERT INTO wo_updates(wo_id, action, performed_by, checklist_complete, notes, attachment_path)
+        VALUES (?, ?, ?, ?, ?, ?)
+    """, (wo_id, action, performed_by.strip(), 1 if checklist_complete else 0, notes, attachment_path))
+    conn.commit()
+    conn.close()
+
+def get_wo_updates(wo_id: int) -> pd.DataFrame:
+    conn = get_conn()
+    df = pd.read_sql_query("""
+        SELECT update_ts, action, performed_by, checklist_complete, notes, attachment_path
+        FROM wo_updates
+        WHERE wo_id=?
+        ORDER BY update_ts DESC
+        LIMIT 50
+    """, conn, params=(wo_id,))
+    conn.close()
+    return df
+
+def set_wo_status(wo_id: int, new_status: str, completed_date: Optional[str] = None):
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute("""
+        UPDATE work_orders
+        SET status=?,
+            completed_date=?,
+            updated_at=datetime('now')
+        WHERE id=?
+    """, (new_status, completed_date, wo_id))
+    conn.commit()
+    conn.close()
+
+DAYS7 = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+
+
+def now_iso() -> str:
     return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-def iso_to_dt(s: str):
+
+def iso_to_dt(s: str) -> datetime:
     return datetime.strptime(s, "%Y-%m-%d %H:%M:%S")
 
-def days_to_due(last_pm: str | None, interval_days: int) -> int | None:
-    if not last_pm:
-        return None
-    due_dt = iso_to_dt(last_pm) + timedelta(days=interval_days)
-    return (due_dt.date() - datetime.now().date()).days
 
-def due_bucket(days_left: int | None) -> str:
-    if days_left is None:
-        return "Unknown"
-    if days_left < 0:
-        return "Overdue"
-    if days_left <= 14:
-        return "Due Soon"
-    return "OK"
-
-def station_pm_header_status(station_df: pd.DataFrame) -> str:
-    buckets = station_df["pm_bucket"].tolist() if "pm_bucket" in station_df.columns else []
-    if "Overdue" in buckets:
-        return "🔴 PM Overdue"
-    if "Due Soon" in buckets:
-        return "🟠 PM Due Soon"
-    if "Unknown" in buckets:
-        return "⚪ PM Unknown"
-    return "🟢 PM OK"
-
-def show_attachment(path_str: str | None, key_prefix: str):
-    if not path_str or not str(path_str).strip():
-        st.info("No attachment.")
-        return
-
-    p = Path(str(path_str))
-=======
 def safe_str(x, default: str = "-") -> str:
     if x is None:
         return default
@@ -273,29 +227,40 @@ def safe_str(x, default: str = "-") -> str:
         return default
     return str(x)
 
-def is_pm_task(r) -> bool:
-    tt = safe_str(r.get("task_type"), "").strip().lower()
-    return "pm" in tt
 
-def date_leq(a: Optional[date], b: Optional[date]) -> bool:
-    if not a or not b:
-        return False
-    return a <= b
-
-def today_str() -> str:
-    return date.today().strftime("%Y-%m-%d")
-
-def now_iso() -> str:
-    return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-def parse_date(s: Optional[str]) -> Optional[date]:
+def parse_date_ymd(s: Optional[str]) -> Optional[date]:
     if not s or not str(s).strip():
         return None
-    return datetime.strptime(str(s), "%Y-%m-%d").date()
+    return datetime.strptime(str(s).strip(), "%Y-%m-%d").date()
 
-def show_attachment(path_str: str, key_prefix: str):
-    p = Path(path_str)
->>>>>>> 10e4590 (synce with changes in codes)
+
+def week_start_sunday(d: date) -> date:
+    # Mon=0..Sun=6  -> want Sunday start
+    shift = (d.weekday() + 1) % 7
+    return d - timedelta(days=shift)
+
+
+def period_range_ymd(mode: str, anchor: date) -> Tuple[date, date]:
+    if mode == "Weekly":
+        start = week_start_sunday(anchor)
+        end = start + timedelta(days=6)
+        return start, end
+
+    start = anchor.replace(day=1)
+    if start.month == 12:
+        next_month = start.replace(year=start.year + 1, month=1, day=1)
+    else:
+        next_month = start.replace(month=start.month + 1, day=1)
+    end = next_month - timedelta(days=1)
+    return start, end
+
+
+def show_attachment(path_str: Optional[str], key_prefix: str):
+    if not path_str or not str(path_str).strip():
+        st.info("No attachment.")
+        return
+
+    p = Path(str(path_str))
     if not p.exists():
         st.warning("Attachment file not found on this PC / server.")
         st.code(str(p))
@@ -312,19 +277,450 @@ def show_attachment(path_str: str, key_prefix: str):
         data=p.read_bytes(),
         file_name=p.name,
         mime=mime,
-<<<<<<< HEAD
-        key=f"dl_{key_prefix}_{p.name}_{p.stat().st_mtime_ns}"
+        key=f"dl_{key_prefix}_{p.name}_{p.stat().st_mtime_ns}",
     )
 
-def evidence_icon(attachment_path: str | None) -> str:
+
+# -----------------------------
+# Planning tables (ensure exist)
+# -----------------------------
+def ensure_planning_tables():
+    conn = get_conn()
+    cur = conn.cursor()
+
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS technicians (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL UNIQUE,
+        department TEXT DEFAULT 'Instrument',
+        is_active INTEGER NOT NULL DEFAULT 1
+    );
+    """)
+
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS wo_plans (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        wo_id INTEGER NOT NULL,
+        plan_date TEXT NOT NULL,             -- YYYY-MM-DD
+        mode TEXT NOT NULL DEFAULT 'Manual', -- Manual / Auto
+        tech_1 TEXT NOT NULL,
+        tech_2 TEXT DEFAULT NULL,
+        notes TEXT DEFAULT NULL,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+        FOREIGN KEY(wo_id) REFERENCES work_orders(id) ON DELETE CASCADE,
+        UNIQUE(wo_id)
+    );
+    """)
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_plans_date ON wo_plans(plan_date);")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_plans_wo ON wo_plans(wo_id);")
+
+    conn.commit()
+    conn.close()
+
+
+def fetch_technicians(dept: str = "Instrument") -> list[str]:
+    ensure_planning_tables()
+    conn = get_conn()
+    df = pd.read_sql_query(
+        "SELECT name FROM technicians WHERE is_active=1 AND department=? ORDER BY name",
+        conn, params=(dept,)
+    )
+    conn.close()
+    return df["name"].tolist()
+
+
+def add_technician(name: str, dept: str = "Instrument"):
+    ensure_planning_tables()
+    name = name.strip()
+    if not name:
+        raise ValueError("Technician name is required.")
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute("INSERT OR IGNORE INTO technicians(name, department, is_active) VALUES (?, ?, 1)", (name, dept))
+    conn.commit()
+    conn.close()
+
+
+def fetch_plans_in_period(start_ymd: str, end_ymd: str) -> pd.DataFrame:
+    ensure_planning_tables()
+    conn = get_conn()
+    df = pd.read_sql_query(
+        """
+        SELECT p.*, w.wo_number, w.station, w.location, w.task_type, w.status, w.due_date
+        FROM wo_plans p
+        JOIN work_orders w ON w.id = p.wo_id
+        WHERE p.plan_date BETWEEN ? AND ?
+        ORDER BY p.plan_date ASC, w.station ASC, w.wo_number ASC
+        """,
+        conn, params=(start_ymd, end_ymd)
+    )
+    conn.close()
+    return df
+
+
+def upsert_plan(wo_id: int, plan_date: str, mode: str, tech_1: str, tech_2: Optional[str], notes: Optional[str]):
+    ensure_planning_tables()
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute("""
+        INSERT INTO wo_plans(wo_id, plan_date, mode, tech_1, tech_2, notes, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
+        ON CONFLICT(wo_id) DO UPDATE SET
+            plan_date=excluded.plan_date,
+            mode=excluded.mode,
+            tech_1=excluded.tech_1,
+            tech_2=excluded.tech_2,
+            notes=excluded.notes,
+            updated_at=datetime('now')
+    """, (wo_id, plan_date, mode, tech_1, tech_2, notes))
+    conn.commit()
+    conn.close()
+
+
+def delete_plan(wo_id: int):
+    ensure_planning_tables()
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute("DELETE FROM wo_plans WHERE wo_id=?", (wo_id,))
+    conn.commit()
+    conn.close()
+
+
+def auto_assign_week(
+    work_orders_df: pd.DataFrame,
+    techs: list[str],
+    start: date,
+    end: date,
+    max_per_tech_per_day: int = 2,
+    two_tech_default: bool = False,
+):
+    """
+    Auto-balances WOs across Sun–Thu and assigns tech_1 (+ optional tech_2).
+    Stores plan in wo_plans (doesn't change SAP due_date).
+    """
+    if not techs:
+        raise ValueError("No technicians found. Add technicians first.")
+
+    # Working days Sun-Thu only
+    days = []
+    d = start
+    while d <= end:
+        if d.weekday() in [6, 0, 1, 2, 3]:  # Sun,Mon,Tue,Wed,Thu
+            days.append(d)
+        d += timedelta(days=1)
+    if not days:
+        raise ValueError("Selected period has no working days (Sun–Thu).")
+
+    # load map: (date, tech)->count
+    load = {(day.strftime("%Y-%m-%d"), t): 0 for day in days for t in techs}
+
+    # count existing plans for week
+    existing = fetch_plans_in_period(days[0].strftime("%Y-%m-%d"), days[-1].strftime("%Y-%m-%d"))
+    for _, r in existing.iterrows():
+        pd_ = str(r["plan_date"])
+        t1 = str(r["tech_1"]) if r.get("tech_1") else None
+        t2 = str(r["tech_2"]) if r.get("tech_2") else None
+        if t1 and (pd_, t1) in load:
+            load[(pd_, t1)] += 1
+        if t2 and (pd_, t2) in load:
+            load[(pd_, t2)] += 1
+
+    # simple round-robin across days
+    day_idx = 0
+    for _, wo in work_orders_df.iterrows():
+        wo_id = int(wo["id"])
+        plan_day = days[day_idx % len(days)]
+        plan_day_s = plan_day.strftime("%Y-%m-%d")
+        day_idx += 1
+
+        tech_sorted = sorted(techs, key=lambda t: load[(plan_day_s, t)])
+
+        tech_1 = None
+        for t in tech_sorted:
+            if load[(plan_day_s, t)] < max_per_tech_per_day:
+                tech_1 = t
+                break
+        if not tech_1:
+            tech_1 = tech_sorted[0]
+        load[(plan_day_s, tech_1)] += 1
+
+        tech_2 = None
+        if two_tech_default:
+            for t in tech_sorted:
+                if t != tech_1 and load[(plan_day_s, t)] < max_per_tech_per_day:
+                    tech_2 = t
+                    break
+            if tech_2:
+                load[(plan_day_s, tech_2)] += 1
+
+        upsert_plan(
+            wo_id=wo_id,
+            plan_date=plan_day_s,
+            mode="Auto",
+            tech_1=tech_1,
+            tech_2=tech_2,
+            notes="Auto planned",
+        )
+
+
+# -----------------------------
+# DB functions (GC / PM)
+# -----------------------------
+def days_to_due(last_pm: Optional[str], interval_days: int) -> Optional[int]:
+    if not last_pm:
+        return None
+    due_dt = iso_to_dt(last_pm) + timedelta(days=interval_days)
+    return (due_dt.date() - datetime.now().date()).days
+
+
+def due_bucket(days_left: Optional[int]) -> str:
+    if days_left is None:
+        return "Unknown"
+    if days_left < 0:
+        return "Overdue"
+    if days_left <= 14:
+        return "Due Soon"
+    return "OK"
+
+
+def station_pm_header_status(station_df: pd.DataFrame) -> str:
+    buckets = station_df["pm_bucket"].tolist() if "pm_bucket" in station_df.columns else []
+    if "Overdue" in buckets:
+        return "🔴 PM Overdue"
+    if "Due Soon" in buckets:
+        return "🟠 PM Due Soon"
+    if "Unknown" in buckets:
+        return "⚪ PM Unknown"
+    return "🟢 PM OK"
+
+
+def evidence_icon(attachment_path: Optional[str]) -> str:
     if attachment_path is not None and pd.notna(attachment_path) and str(attachment_path).strip():
         return "📎"
     return "⚪"
 
-def safe_str(x, default="-"):
-    if x is None or (isinstance(x, float) and pd.isna(x)) or (isinstance(x, str) and not x.strip()):
-        return default
-    return str(x)
+
+def fetch_kpis() -> pd.DataFrame:
+    conn = get_conn()
+
+    analyzers = pd.read_sql_query(
+        """
+        SELECT id, tag, location, station, role, pm_interval_days
+        FROM analyzers
+        ORDER BY station, role, id
+        """,
+        conn,
+    )
+
+    last_pm_row = pd.read_sql_query(
+        """
+        SELECT l.analyzer_id,
+               l.pm_date,
+               l.checklist_complete,
+               l.performed_by,
+               l.notes,
+               l.attachment_path
+        FROM pm_logs l
+        INNER JOIN (
+            SELECT analyzer_id, MAX(pm_date) AS max_pm_date
+            FROM pm_logs
+            GROUP BY analyzer_id
+        ) x
+        ON x.analyzer_id = l.analyzer_id
+       AND x.max_pm_date = l.pm_date
+        """,
+        conn,
+    )
+
+    conn.close()
+
+    df = analyzers.merge(last_pm_row, left_on="id", right_on="analyzer_id", how="left").drop(columns=["analyzer_id"])
+    df["station"] = df["station"].fillna(df["location"])
+
+    def _calc_days(r):
+        pm_date = r.get("pm_date")
+        last = None if (pm_date is None or pd.isna(pm_date)) else str(pm_date)
+        return days_to_due(last, int(r["pm_interval_days"]))
+
+    df["pm_days_left"] = df.apply(_calc_days, axis=1)
+    df["pm_bucket"] = df["pm_days_left"].apply(due_bucket)
+
+    def _next_due(r):
+        pm_date = r.get("pm_date")
+        if pm_date is None or pd.isna(pm_date):
+            return None
+        due_dt = iso_to_dt(str(pm_date)) + timedelta(days=int(r["pm_interval_days"]))
+        return due_dt.strftime("%Y-%m-%d")
+
+    df["next_pm_due"] = df.apply(_next_due, axis=1)
+    return df
+
+
+def add_station_pair_add_only(station: str, location: str, duty_tag: str, standby_tag: str, pm_interval_days: int):
+    station = station.strip()
+    location = location.strip()
+    duty_tag = duty_tag.strip()
+    standby_tag = standby_tag.strip()
+
+    if not station or not location or not duty_tag or not standby_tag:
+        raise ValueError("Please fill: station, location, duty tag, standby tag.")
+    if duty_tag == standby_tag:
+        raise ValueError("Duty tag and Standby tag cannot be the same.")
+
+    conn = get_conn()
+
+    existing_station = pd.read_sql_query(
+        "SELECT tag, role FROM analyzers WHERE station=? AND role IN ('Duty','Standby')",
+        conn,
+        params=(station,),
+    )
+    if len(existing_station) > 0:
+        conn.close()
+        raise ValueError(
+            f"Station '{station}' already exists.\n"
+            "Use a different Station name OR use Edit Station tab."
+        )
+
+    cur = conn.cursor()
+    cur.execute(
+        """
+        INSERT INTO analyzers(tag, location, station, role, pm_interval_days)
+        VALUES(?, ?, ?, 'Duty', ?)
+        """,
+        (duty_tag, location, station, int(pm_interval_days)),
+    )
+    cur.execute(
+        """
+        INSERT INTO analyzers(tag, location, station, role, pm_interval_days)
+        VALUES(?, ?, ?, 'Standby', ?)
+        """,
+        (standby_tag, location, station, int(pm_interval_days)),
+    )
+
+    conn.commit()
+    conn.close()
+
+
+def update_station_pair(station_old: str, station_new: str, location: str,
+                        duty_tag: str, standby_tag: str, pm_interval_days: int):
+    station_old = station_old.strip()
+    station_new = station_new.strip()
+    location = location.strip()
+    duty_tag = duty_tag.strip()
+    standby_tag = standby_tag.strip()
+
+    if not station_new or not location or not duty_tag or not standby_tag:
+        raise ValueError("Please fill all fields.")
+    if duty_tag == standby_tag:
+        raise ValueError("Duty tag and Standby tag cannot be the same.")
+
+    conn = get_conn()
+
+    existing = pd.read_sql_query(
+        "SELECT id, role FROM analyzers WHERE station=? AND role IN ('Duty','Standby')",
+        conn,
+        params=(station_old,),
+    )
+    if len(existing) == 0:
+        conn.close()
+        raise ValueError("Selected station not found.")
+
+    if station_new != station_old:
+        check_new = pd.read_sql_query(
+            "SELECT 1 FROM analyzers WHERE station=? LIMIT 1",
+            conn,
+            params=(station_new,),
+        )
+        if len(check_new) > 0:
+            conn.close()
+            raise ValueError(f"Station name '{station_new}' already exists.")
+
+    duty_row = pd.read_sql_query(
+        "SELECT id FROM analyzers WHERE station=? AND role='Duty' LIMIT 1",
+        conn,
+        params=(station_old,),
+    )
+    standby_row = pd.read_sql_query(
+        "SELECT id FROM analyzers WHERE station=? AND role='Standby' LIMIT 1",
+        conn,
+        params=(station_old,),
+    )
+    if len(duty_row) == 0 or len(standby_row) == 0:
+        conn.close()
+        raise ValueError("This station must have both Duty and Standby.")
+
+    duty_id = int(duty_row.iloc[0]["id"])
+    standby_id = int(standby_row.iloc[0]["id"])
+
+    dup = pd.read_sql_query(
+        """
+        SELECT id, role, tag
+        FROM analyzers
+        WHERE station=? AND tag IN (?, ?)
+          AND id NOT IN (?, ?)
+        """,
+        conn,
+        params=(station_new, duty_tag, standby_tag, duty_id, standby_id),
+    )
+    if len(dup) > 0:
+        conn.close()
+        raise ValueError("Duplicate tag inside this station (station, tag must be unique).")
+
+    cur = conn.cursor()
+    cur.execute("BEGIN")
+    cur.execute(
+        """
+        UPDATE analyzers
+        SET station=?, location=?, tag=?, pm_interval_days=?
+        WHERE id=?
+        """,
+        (station_new, location, duty_tag, int(pm_interval_days), duty_id),
+    )
+    cur.execute(
+        """
+        UPDATE analyzers
+        SET station=?, location=?, tag=?, pm_interval_days=?
+        WHERE id=?
+        """,
+        (station_new, location, standby_tag, int(pm_interval_days), standby_id),
+    )
+
+    conn.commit()
+    conn.close()
+
+
+def add_pm_log(analyzer_id: int, pm_date: str, checklist_complete: bool, performed_by: str,
+               notes: Optional[str], attachment_path: Optional[str]):
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute(
+        """
+        INSERT INTO pm_logs(analyzer_id, pm_date, checklist_complete, performed_by, notes, attachment_path)
+        VALUES (?, ?, ?, ?, ?, ?)
+        """,
+        (analyzer_id, pm_date, 1 if checklist_complete else 0, performed_by.strip(), notes, attachment_path),
+    )
+    conn.commit()
+    conn.close()
+
+
+def get_pm_logs(analyzer_id: int) -> pd.DataFrame:
+    conn = get_conn()
+    df = pd.read_sql_query(
+        """
+        SELECT pm_date, checklist_complete, performed_by, notes, attachment_path
+        FROM pm_logs
+        WHERE analyzer_id=?
+        ORDER BY pm_date DESC
+        LIMIT 50
+        """,
+        conn,
+        params=(analyzer_id,),
+    )
+    conn.close()
+    return df
+
 
 def station_summary(df_all: pd.DataFrame, station: str):
     sg = df_all[df_all["station"] == station].copy()
@@ -352,444 +748,155 @@ def station_summary(df_all: pd.DataFrame, station: str):
         "standby_ev": standby_ev,
     }
 
+
 # -----------------------------
-# DB functions
+# Work Orders table (auto create + migrate if needed)
 # -----------------------------
-def fetch_kpis() -> pd.DataFrame:
+def ensure_work_orders_table():
     conn = get_conn()
-
-    analyzers = pd.read_sql_query("""
-        SELECT id, tag, location, station, role, pm_interval_days
-        FROM analyzers
-        ORDER BY station, role, id
-    """, conn)
-
-    last_pm_row = pd.read_sql_query("""
-        SELECT l.analyzer_id,
-               l.pm_date,
-               l.checklist_complete,
-               l.performed_by,
-               l.notes,
-               l.attachment_path
-        FROM pm_logs l
-        INNER JOIN (
-            SELECT analyzer_id, MAX(pm_date) AS max_pm_date
-            FROM pm_logs
-            GROUP BY analyzer_id
-        ) x
-        ON x.analyzer_id = l.analyzer_id
-       AND x.max_pm_date = l.pm_date
-    """, conn)
-
-    conn.close()
-
-    df = analyzers.merge(last_pm_row, left_on="id", right_on="analyzer_id", how="left").drop(columns=["analyzer_id"])
-    df["station"] = df["station"].fillna(df["location"])
-
-    def _calc_days(r):
-        pm_date = r.get("pm_date")
-        last = None if (pm_date is None or pd.isna(pm_date)) else pm_date
-        return days_to_due(last, int(r["pm_interval_days"]))
-    df["pm_days_left"] = df.apply(_calc_days, axis=1)
-    df["pm_bucket"] = df["pm_days_left"].apply(due_bucket)
-
-    def _next_due(r):
-        pm_date = r.get("pm_date")
-        if pm_date is None or pd.isna(pm_date):
-            return None
-        due_dt = iso_to_dt(pm_date) + timedelta(days=int(r["pm_interval_days"]))
-        return due_dt.strftime("%Y-%m-%d")
-    df["next_pm_due"] = df.apply(_next_due, axis=1)
-
-    return df
-
-def add_station_pair_add_only(station: str, location: str, duty_tag: str, standby_tag: str, pm_interval_days: int):
-    station = station.strip()
-    location = location.strip()
-    duty_tag = duty_tag.strip()
-    standby_tag = standby_tag.strip()
-
-    if not station or not location or not duty_tag or not standby_tag:
-        raise ValueError("Please fill: station, location, duty tag, standby tag.")
-    if duty_tag == standby_tag:
-        raise ValueError("Duty tag and Standby tag cannot be the same.")
-
-    conn = get_conn()
-
-    existing_station = pd.read_sql_query(
-        "SELECT tag, role FROM analyzers WHERE station=? AND role IN ('Duty','Standby')",
-        conn, params=(station,)
-    )
-    if len(existing_station) > 0:
-        conn.close()
-        raise ValueError(
-            f"Station '{station}' already exists.\n"
-            "Use a different Station name OR use Edit Station tab."
-        )
-
-    existing_tags_same_station = pd.read_sql_query(
-        "SELECT tag, role FROM analyzers WHERE station=? AND tag IN (?, ?)",
-        conn, params=(station, duty_tag, standby_tag)
-    )
-    if len(existing_tags_same_station) > 0:
-        conn.close()
-        msg = "\n".join([f"- {r['tag']} already exists in this station (Role: {r['role']})"
-                         for _, r in existing_tags_same_station.iterrows()])
-        raise ValueError("These GC tags already exist in this station:\n" + msg)
-
     cur = conn.cursor()
-    cur.execute("""
-        INSERT INTO analyzers(tag, location, station, role, pm_interval_days)
-        VALUES(?, ?, ?, 'Duty', ?)
-    """, (duty_tag, location, station, int(pm_interval_days)))
 
-    cur.execute("""
-        INSERT INTO analyzers(tag, location, station, role, pm_interval_days)
-        VALUES(?, ?, ?, 'Standby', ?)
-    """, (standby_tag, location, station, int(pm_interval_days)))
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS work_orders (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            wo_number TEXT NOT NULL UNIQUE,
+            station TEXT NOT NULL,
+            location TEXT,
+            task_type TEXT NOT NULL DEFAULT 'PM',
+            priority INTEGER DEFAULT 99,
+            est_hours REAL DEFAULT 1.0,
+            planned_date TEXT,
+            due_date TEXT,
+            status TEXT NOT NULL DEFAULT 'Planned',
+            assigned_to TEXT,
+            completed_date TEXT,
+            notes TEXT,
+            created_at TEXT NOT NULL DEFAULT (datetime('now')),
+            updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+        );
+        """
+    )
+
+    cur.execute("PRAGMA table_info(work_orders);")
+    cols = {r[1] for r in cur.fetchall()}
+
+    if "priority" not in cols:
+        cur.execute("ALTER TABLE work_orders ADD COLUMN priority INTEGER DEFAULT 99;")
+    if "est_hours" not in cols:
+        cur.execute("ALTER TABLE work_orders ADD COLUMN est_hours REAL DEFAULT 1.0;")
+
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_wo_due ON work_orders(due_date);")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_wo_station ON work_orders(station);")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_wo_status ON work_orders(status);")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_wo_priority ON work_orders(priority);")
 
     conn.commit()
     conn.close()
 
-def update_station_pair(station_old: str, station_new: str, location: str,
-                        duty_tag: str, standby_tag: str, pm_interval_days: int):
-    station_old = station_old.strip()
-    station_new = station_new.strip()
-    location = location.strip()
-    duty_tag = duty_tag.strip()
-    standby_tag = standby_tag.strip()
 
-    if not station_new or not location or not duty_tag or not standby_tag:
-        raise ValueError("Please fill all fields.")
-    if duty_tag == standby_tag:
-        raise ValueError("Duty tag and Standby tag cannot be the same.")
-
-    conn = get_conn()
-
-    existing = pd.read_sql_query(
-        "SELECT id, role FROM analyzers WHERE station=? AND role IN ('Duty','Standby')",
-        conn, params=(station_old,)
-    )
-    if len(existing) == 0:
-        conn.close()
-        raise ValueError("Selected station not found.")
-
-    if station_new != station_old:
-        check_new = pd.read_sql_query(
-            "SELECT 1 FROM analyzers WHERE station=? LIMIT 1",
-            conn, params=(station_new,)
-        )
-        if len(check_new) > 0:
-            conn.close()
-            raise ValueError(f"Station name '{station_new}' already exists.")
-
-    duty_row = pd.read_sql_query(
-        "SELECT id FROM analyzers WHERE station=? AND role='Duty' LIMIT 1",
-        conn, params=(station_old,)
-    )
-    standby_row = pd.read_sql_query(
-        "SELECT id FROM analyzers WHERE station=? AND role='Standby' LIMIT 1",
-        conn, params=(station_old,)
-    )
-    if len(duty_row) == 0 or len(standby_row) == 0:
-        conn.close()
-        raise ValueError("This station must have both Duty and Standby.")
-
-    duty_id = int(duty_row.iloc[0]["id"])
-    standby_id = int(standby_row.iloc[0]["id"])
-
-    dup = pd.read_sql_query("""
-        SELECT id, role, tag
-        FROM analyzers
-        WHERE station=? AND tag IN (?, ?)
-          AND id NOT IN (?, ?)
-    """, conn, params=(station_new, duty_tag, standby_tag, duty_id, standby_id))
-    if len(dup) > 0:
-        conn.close()
-        raise ValueError("Duplicate tag inside this station (station, tag must be unique).")
-
-    cur = conn.cursor()
-    cur.execute("BEGIN")
-    cur.execute("""
-        UPDATE analyzers
-        SET station=?, location=?, tag=?, pm_interval_days=?
-        WHERE id=?
-    """, (station_new, location, duty_tag, int(pm_interval_days), duty_id))
-
-    cur.execute("""
-        UPDATE analyzers
-        SET station=?, location=?, tag=?, pm_interval_days=?
-        WHERE id=?
-    """, (station_new, location, standby_tag, int(pm_interval_days), standby_id))
-
-    conn.commit()
-    conn.close()
-
-def add_pm_log(analyzer_id: int, pm_date: str, checklist_complete: bool, performed_by: str,
-               notes: str | None, attachment_path: str | None):
-    conn = get_conn()
-    cur = conn.cursor()
-    cur.execute("""
-        INSERT INTO pm_logs(analyzer_id, pm_date, checklist_complete, performed_by, notes, attachment_path)
-        VALUES (?, ?, ?, ?, ?, ?)
-    """, (analyzer_id, pm_date, 1 if checklist_complete else 0, performed_by.strip(), notes, attachment_path))
-    conn.commit()
-    conn.close()
-
-def get_pm_logs(analyzer_id: int):
-    conn = get_conn()
-    df = pd.read_sql_query("""
-        SELECT pm_date, checklist_complete, performed_by, notes, attachment_path
-        FROM pm_logs
-        WHERE analyzer_id=?
-        ORDER BY pm_date DESC
-        LIMIT 50
-    """, conn, params=(analyzer_id,))
-=======
-        key=f"dl_{key_prefix}_{p.name}_{p.stat().st_mtime_ns}",
-    )
-
-def kpi_cards(planned: int = 0, done: int = 0, overdue: int = 0, rate: int = 0):
-    st.markdown(
-        f"""
-    <div class="kpi-row">
-      <div class="kpi-card">
-        <div class="kpi-title">Planned</div>
-        <div class="kpi-value">{planned}</div>
-        <div class="kpi-sub">In selected period</div>
-      </div>
-      <div class="kpi-card">
-        <div class="kpi-title">Completed</div>
-        <div class="kpi-value">{done}</div>
-        <div class="kpi-sub">In selected period</div>
-      </div>
-      <div class="kpi-card">
-        <div class="kpi-title">Overdue</div>
-        <div class="kpi-value">{overdue}</div>
-        <div class="kpi-sub">Due date passed</div>
-      </div>
-      <div class="kpi-card">
-        <div class="kpi-title">Completion %</div>
-        <div class="kpi-value">{rate}%</div>
-        <div class="kpi-sub">On-time / Planned</div>
-      </div>
-    </div>
-    """,
-        unsafe_allow_html=True,
-    )
-
-def compute_overdue(row) -> bool:
-    stt = safe_str(row.get("status"), "")
-    if stt in ["Done", "Cancelled"]:
-        return False
-    due = parse_date(row.get("due_date"))
-    if not due:
-        return False
-    return due < date.today()
-
-def period_range(mode: str, any_day: date) -> Tuple[date, date]:
-    # Week = Sun..Sat
-    if mode == "Weekly":
-        days_since_sun = (any_day.weekday() + 1) % 7  # Sunday -> 0
-        start = any_day - timedelta(days=days_since_sun)
-        end = start + timedelta(days=6)
-        return start, end
-
-    start = any_day.replace(day=1)
-    if start.month == 12:
-        next_month = start.replace(year=start.year + 1, month=1, day=1)
-    else:
-        next_month = start.replace(month=start.month + 1, day=1)
-    end = next_month - timedelta(days=1)
-    return start, end
-
-# -----------------------------
-# DB Operations
-# -----------------------------
-def fetch_validations() -> pd.DataFrame:
+def fetch_work_orders() -> pd.DataFrame:
+    ensure_work_orders_table()
     conn = get_conn()
     df = pd.read_sql_query(
         """
         SELECT *
-        FROM validations
+        FROM work_orders
         ORDER BY
           CASE status
             WHEN 'Planned' THEN 1
             WHEN 'In Progress' THEN 2
             WHEN 'Done' THEN 3
-            WHEN 'Failed' THEN 4
-            WHEN 'Cancelled' THEN 5
+            WHEN 'Cancelled' THEN 4
             ELSE 9
           END,
           due_date IS NULL, due_date ASC,
+          priority ASC,
           id DESC
-    """,
+        """,
         conn,
     )
     conn.close()
     return df
 
-def insert_validation(payload: dict) -> int:
+
+def insert_work_order(payload: dict) -> int:
+    ensure_work_orders_table()
     conn = get_conn()
     cur = conn.cursor()
     cur.execute(
         """
-        INSERT INTO validations
-        (customer_name, validation_type, station, asset_tag, planned_date, due_date,
-         status, result, report_no, notes, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    """,
-        (
-            payload["customer_name"],
-            payload["validation_type"],
-            payload.get("station"),
-            payload.get("asset_tag"),
-            payload.get("planned_date"),
-            payload.get("due_date"),
-            payload.get("status", "Planned"),
-            payload.get("result"),
-            payload.get("report_no"),
-            payload.get("notes"),
-            now_iso(),
-            now_iso(),
-        ),
-    )
-    vid = cur.lastrowid
-    conn.commit()
-    conn.close()
-    return int(vid)
-
-def fetch_tasks() -> pd.DataFrame:
-    conn = get_conn()
-    df = pd.read_sql_query(
-        """
-        SELECT *
-        FROM tasks
-        ORDER BY
-          CASE status
-            WHEN 'Planned' THEN 1
-            WHEN 'In Progress' THEN 2
-            WHEN 'On Hold' THEN 3
-            WHEN 'Done' THEN 4
-            WHEN 'Cancelled' THEN 5
-            ELSE 9
-          END,
-          due_date IS NULL, due_date ASC,
-          id DESC
-    """,
-        conn,
-    )
-    conn.close()
-
-    if len(df):
-        df["is_overdue"] = df.apply(compute_overdue, axis=1)
-    else:
-        df["is_overdue"] = False
-    return df
-
-def insert_task(payload: dict) -> int:
-    conn = get_conn()
-    cur = conn.cursor()
-    cur.execute(
-        """
-        INSERT INTO tasks
-        (wo_number, station, location, department, task_type, asset_tag,
-         planned_date, due_date, status, assigned_to, completed_date, notes, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    """,
+        INSERT INTO work_orders
+        (wo_number, station, location, task_type, priority, est_hours, planned_date, due_date, status,
+         assigned_to, completed_date, notes, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
+        """,
         (
             payload["wo_number"],
             payload["station"],
             payload.get("location"),
-            payload["department"],
-            payload["task_type"],
-            payload.get("asset_tag"),
+            payload.get("task_type", "PM"),
+            int(payload.get("priority", 99)),
+            float(payload.get("est_hours", 1.0)),
             payload.get("planned_date"),
             payload.get("due_date"),
             payload.get("status", "Planned"),
             payload.get("assigned_to"),
             payload.get("completed_date"),
             payload.get("notes"),
-            now_iso(),
-            now_iso(),
         ),
     )
-    task_id = cur.lastrowid
+    new_id = cur.lastrowid
     conn.commit()
     conn.close()
-    return int(task_id)
+    return int(new_id)
 
-def update_task(task_id: int, payload: dict):
+
+def update_work_order(wo_id: int, payload: dict):
+    ensure_work_orders_table()
     conn = get_conn()
     cur = conn.cursor()
     cur.execute(
         """
-        UPDATE tasks
-        SET wo_number=?, station=?, location=?, department=?, task_type=?, asset_tag=?,
-            planned_date=?, due_date=?, status=?, assigned_to=?, completed_date=?, notes=?, updated_at=?
+        UPDATE work_orders
+        SET wo_number=?, station=?, location=?, task_type=?, priority=?, est_hours=?,
+            planned_date=?, due_date=?, status=?, assigned_to=?, completed_date=?, notes=?,
+            updated_at=datetime('now')
         WHERE id=?
-    """,
+        """,
         (
             payload["wo_number"],
             payload["station"],
             payload.get("location"),
-            payload["department"],
-            payload["task_type"],
-            payload.get("asset_tag"),
+            payload.get("task_type", "PM"),
+            int(payload.get("priority", 99)),
+            float(payload.get("est_hours", 1.0)),
             payload.get("planned_date"),
             payload.get("due_date"),
             payload.get("status", "Planned"),
             payload.get("assigned_to"),
             payload.get("completed_date"),
             payload.get("notes"),
-            now_iso(),
-            task_id,
+            wo_id,
         ),
     )
     conn.commit()
     conn.close()
 
-def add_attachment(task_id: int, file_path: str):
-    conn = get_conn()
-    cur = conn.cursor()
-    cur.execute(
-        """
-        INSERT INTO task_attachments(task_id, file_path, uploaded_at)
-        VALUES (?, ?, ?)
-    """,
-        (task_id, file_path, now_iso()),
-    )
-    conn.commit()
-    conn.close()
-
-def fetch_attachments(task_id: int) -> pd.DataFrame:
-    conn = get_conn()
-    df = pd.read_sql_query(
-        """
-        SELECT id, file_path, uploaded_at
-        FROM task_attachments
-        WHERE task_id=?
-        ORDER BY uploaded_at DESC
-    """,
-        conn,
-        params=(task_id,),
-    )
->>>>>>> 10e4590 (synce with changes in codes)
-    conn.close()
-    return df
 
 # -----------------------------
-# UI
+# UI: Title + Tabs
 # -----------------------------
-<<<<<<< HEAD
 st.title("GC Analyzer PM Tracking Dashboard")
 
-tab1, tab2, tab_edit, tab3 = st.tabs(["Dashboard", "Add Station Pair", "Edit Station", "Logs & Attachments"])
+tab_dash, tab_stations, tab_pm, tab_wo, tab_today, tab_weekly = st.tabs(
+    ["📊 Dashboard", "🏭 Stations Management", "🛠 PM Logs & Attachments", "📋 Work Orders & Compliance", "📌 Today & Tomorrow", "📅 Weekly Planner (Private Plan)"]
+)
 
 # -----------------------------
-# Dashboard renderers
+# Dashboard render helpers
 # -----------------------------
-def render_station_grid(df: pd.DataFrame, stations: list[str], mode: str):
+def render_station_grid(df: pd.DataFrame, stations: list, mode: str):
     if mode == "BIG":
         cols_per_row = 1
     elif mode == "MED":
@@ -846,7 +953,8 @@ def render_station_grid(df: pd.DataFrame, stations: list[str], mode: str):
                         st.session_state["selected_station"] = station
                         st.rerun()
 
-def render_station_list(df: pd.DataFrame, stations: list[str]):
+
+def render_station_list(df: pd.DataFrame, stations: list):
     rows = []
     for station in stations:
         s = station_summary(df, station)
@@ -872,62 +980,34 @@ def render_station_list(df: pd.DataFrame, stations: list[str]):
                 st.session_state["selected_station"] = station
                 st.rerun()
 
+
 # -----------------------------
-# Tab 1: Dashboard
+# Tab: Dashboard
 # -----------------------------
-with tab1:
+with tab_dash:
     df = fetch_kpis()
 
     total_analyzers = len(df)
     total_stations = df["station"].nunique() if len(df) else 0
-    overdue_count = int((df["pm_bucket"] == "Overdue").sum())
-    due_soon_count = int((df["pm_bucket"] == "Due Soon").sum())
+    overdue_count = int((df["pm_bucket"] == "Overdue").sum()) if len(df) else 0
+    due_soon_count = int((df["pm_bucket"] == "Due Soon").sum()) if len(df) else 0
 
-    # KPI cards
-    st.markdown(f"""
-    <div class="kpi-row">
-      <div class="kpi-card">
-        <div class="kpi-title">Stations</div>
-        <div class="kpi-value">{total_stations}</div>
-        <div class="kpi-sub">Active stations</div>
-      </div>
-      <div class="kpi-card">
-        <div class="kpi-title">Total GC</div>
-        <div class="kpi-value">{total_analyzers}</div>
-        <div class="kpi-sub">All analyzers</div>
-      </div>
-      <div class="kpi-card">
-        <div class="kpi-title">PM Overdue</div>
-        <div class="kpi-value">{overdue_count}</div>
-        <div class="kpi-sub">Needs action</div>
-      </div>
-      <div class="kpi-card">
-        <div class="kpi-title">PM Due Soon</div>
-        <div class="kpi-value">{due_soon_count}</div>
-        <div class="kpi-sub">Next 14 days</div>
-      </div>
-    </div>
-    """, unsafe_allow_html=True)
-=======
-st.title("Instrumentation Tasks Dashboard")
+    st.markdown(
+        f"""
+        <div class="kpi-row">
+          <div class="kpi-card"><div class="kpi-title">Stations</div><div class="kpi-value">{total_stations}</div><div class="kpi-sub">Active stations</div></div>
+          <div class="kpi-card"><div class="kpi-title">Total GC</div><div class="kpi-value">{total_analyzers}</div><div class="kpi-sub">All analyzers</div></div>
+          <div class="kpi-card"><div class="kpi-title">PM Overdue</div><div class="kpi-value">{overdue_count}</div><div class="kpi-sub">Needs action</div></div>
+          <div class="kpi-card"><div class="kpi-title">PM Due Soon</div><div class="kpi-value">{due_soon_count}</div><div class="kpi-sub">Next 14 days</div></div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
-tab1, tab2, tab3, tab4 = st.tabs(
-    ["Overview (KPI)", "Add / Edit Tasks", "Attachments", "Validation"]
-)
-
-# -----------------------------
-# Tab 1: Overview KPI
-# -----------------------------
-with tab1:
-    df = fetch_tasks()
->>>>>>> 10e4590 (synce with changes in codes)
-
-    # Control bar
     st.markdown('<div class="control-bar">', unsafe_allow_html=True)
 
     st.markdown('<div class="control-box">', unsafe_allow_html=True)
     st.markdown('<div class="small-label">Search</div>', unsafe_allow_html=True)
-<<<<<<< HEAD
     search = st.text_input("", placeholder="Station / Location / Tag", label_visibility="collapsed")
     st.markdown('</div>', unsafe_allow_html=True)
 
@@ -960,11 +1040,12 @@ with tab1:
 
     if "selected_station" not in st.session_state:
         st.session_state["selected_station"] = None
+    if "open_attach_for" not in st.session_state:
+        st.session_state["open_attach_for"] = None
 
     if len(df) == 0:
         st.info("No stations yet. Add station pairs first.")
     else:
-        # Search filter for stations
         station_list = sorted(df["station"].unique().tolist())
         if search and search.strip():
             q = search.strip().lower()
@@ -975,7 +1056,6 @@ with tab1:
                 or q in " ".join(df[df["station"] == s]["tag"].astype(str).tolist()).lower()
             ]
 
-        # Station-level flags for filters
         stations = []
         for station, g in df.groupby("station"):
             if station not in station_list:
@@ -1005,7 +1085,6 @@ with tab1:
         else:
             render_station_grid(df, filtered_stations, "SMALL")
 
-        # Details panel
         sel = st.session_state.get("selected_station")
         if sel:
             st.divider()
@@ -1056,7 +1135,6 @@ with tab1:
                 render_gc(cols2[0], "GC-01", duty_df, "Duty")
                 render_gc(cols2[1], "GC-02", standby_df, "Standby")
 
-        # Shared PM+Attachment form
         open_for = st.session_state.get("open_attach_for")
         if open_for:
             st.divider()
@@ -1068,7 +1146,7 @@ with tab1:
 
             with st.form("attach_form"):
                 st.text_input("GC Tag", value=tag, disabled=True)
-                performed_by = st.text_input("Performed by (saved for future)", value=st.session_state.get("quick_name", ""))
+                performed_by = st.text_input("Performed by", value=st.session_state.get("quick_name", ""))
                 pm_date = st.text_input("PM date (YYYY-MM-DD HH:MM:SS)", value=now_iso())
                 checklist = st.checkbox("PM checklist completion", value=True)
                 notes = st.text_area("Notes", placeholder="Findings / parts changed / WO ref")
@@ -1098,78 +1176,80 @@ with tab1:
                         except Exception:
                             st.error("Invalid timestamp format. Use: YYYY-MM-DD HH:MM:SS")
 
-# -----------------------------
-# Tab 2: Add Station Pair
-# -----------------------------
-with tab2:
-    st.subheader("Add Station Pair (Duty + Standby)")
-    with st.form("station_pair_form", clear_on_submit=True):
-        station = st.text_input("Station name (unique)", placeholder="e.g., BCS-01")
-        location = st.text_input("Location / Area", placeholder="e.g., BCS")
-        duty_tag = st.text_input("Duty GC tag", value="GC-01")
-        standby_tag = st.text_input("Standby GC tag", value="GC-02")
-        pm_interval_days = st.number_input("PM interval (days)", min_value=1, value=90, step=1)
-        submitted = st.form_submit_button("Add Station Pair")
-
-        if submitted:
-            try:
-                add_station_pair_add_only(station, location, duty_tag, standby_tag, int(pm_interval_days))
-                st.success("Added. Go to Dashboard to see it.")
-            except Exception as e:
-                st.error(str(e))
 
 # -----------------------------
-# Tab: Edit Station
+# Tab: Stations Management
 # -----------------------------
-with tab_edit:
-    st.subheader("Edit Station")
-    df = fetch_kpis()
-    if len(df) == 0:
-        st.info("No stations yet.")
-    else:
-        stations = sorted(df["station"].unique().tolist())
-        selected = st.selectbox("Select station to edit", stations)
+with tab_stations:
+    sub_add, sub_edit = st.tabs(["➕ Add Station Pair", "✏️ Edit Station"])
 
-        sg = df[df["station"] == selected].copy()
-        location_current = sg["location"].iloc[0] if len(sg) else ""
+    with sub_add:
+        st.subheader("Add Station Pair (Duty + Standby)")
+        with st.form("station_pair_form", clear_on_submit=True):
+            station = st.text_input("Station name (unique)", placeholder="e.g., BCS-01")
+            location = st.text_input("Location / Area", placeholder="e.g., BCS")
+            duty_tag = st.text_input("Duty GC tag", value="GC-01")
+            standby_tag = st.text_input("Standby GC tag", value="GC-02")
+            pm_interval_days = st.number_input("PM interval (days)", min_value=1, value=90, step=1)
+            submitted = st.form_submit_button("Add Station Pair")
 
-        duty = sg[sg["role"] == "Duty"].head(1)
-        standby = sg[sg["role"] == "Standby"].head(1)
-
-        duty_tag_current = duty["tag"].iloc[0] if len(duty) else "GC-01"
-        standby_tag_current = standby["tag"].iloc[0] if len(standby) else "GC-02"
-        interval_current = int(sg["pm_interval_days"].iloc[0]) if len(sg) else 90
-
-        with st.form("edit_station_form"):
-            station_new = st.text_input("Station name", value=selected)
-            location_new = st.text_input("Location / Area", value=location_current)
-            col1, col2 = st.columns(2)
-            with col1:
-                duty_tag_new = st.text_input("Duty tag", value=duty_tag_current)
-            with col2:
-                standby_tag_new = st.text_input("Standby tag", value=standby_tag_current)
-            pm_interval_new = st.number_input("PM interval (days)", min_value=1, value=interval_current, step=1)
-
-            save = st.form_submit_button("Save Changes")
-            if save:
+            if submitted:
                 try:
-                    update_station_pair(
-                        station_old=selected,
-                        station_new=station_new,
-                        location=location_new,
-                        duty_tag=duty_tag_new,
-                        standby_tag=standby_tag_new,
-                        pm_interval_days=int(pm_interval_new)
-                    )
-                    st.success("Station updated successfully.")
-                    st.rerun()
+                    add_station_pair_add_only(station, location, duty_tag, standby_tag, int(pm_interval_days))
+                    st.success("Added. Go to Dashboard to see it.")
                 except Exception as e:
                     st.error(str(e))
 
+    with sub_edit:
+        st.subheader("Edit Station")
+        df = fetch_kpis()
+        if len(df) == 0:
+            st.info("No stations yet.")
+        else:
+            stations = sorted(df["station"].unique().tolist())
+            selected = st.selectbox("Select station to edit", stations)
+
+            sg = df[df["station"] == selected].copy()
+            location_current = sg["location"].iloc[0] if len(sg) else ""
+
+            duty = sg[sg["role"] == "Duty"].head(1)
+            standby = sg[sg["role"] == "Standby"].head(1)
+
+            duty_tag_current = duty["tag"].iloc[0] if len(duty) else "GC-01"
+            standby_tag_current = standby["tag"].iloc[0] if len(standby) else "GC-02"
+            interval_current = int(sg["pm_interval_days"].iloc[0]) if len(sg) else 90
+
+            with st.form("edit_station_form"):
+                station_new = st.text_input("Station name", value=selected)
+                location_new = st.text_input("Location / Area", value=location_current)
+                col1, col2 = st.columns(2)
+                with col1:
+                    duty_tag_new = st.text_input("Duty tag", value=duty_tag_current)
+                with col2:
+                    standby_tag_new = st.text_input("Standby tag", value=standby_tag_current)
+                pm_interval_new = st.number_input("PM interval (days)", min_value=1, value=interval_current, step=1)
+
+                save = st.form_submit_button("Save Changes")
+                if save:
+                    try:
+                        update_station_pair(
+                            station_old=selected,
+                            station_new=station_new,
+                            location=location_new,
+                            duty_tag=duty_tag_new,
+                            standby_tag=standby_tag_new,
+                            pm_interval_days=int(pm_interval_new)
+                        )
+                        st.success("Station updated successfully.")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(str(e))
+
+
 # -----------------------------
-# Tab 3: Logs & Attachments
+# Tab: PM Logs & Attachments
 # -----------------------------
-with tab3:
+with tab_pm:
     df = fetch_kpis()
     if len(df) == 0:
         st.info("Add station pairs first.")
@@ -1228,352 +1308,421 @@ with tab3:
                         st.success("PM saved.")
                         st.rerun()
                     except Exception:
-                        st.error("Invalid timestamp format.")
-=======
-    q = st.text_input(
-        "Search",
-        placeholder="WO / Station / Tag / Assigned / Type",
-        label_visibility="collapsed",
-        key="kpi_search",
-    )
-    st.markdown("</div>", unsafe_allow_html=True)
+                        st.error("Invalid timestamp format. Use: YYYY-MM-DD HH:MM:SS")
 
-    st.markdown('<div class="control-box">', unsafe_allow_html=True)
-    c1, c2 = st.columns(2)
-    with c1:
-        st.markdown('<div class="small-label">KPI Mode</div>', unsafe_allow_html=True)
-        mode = st.radio("mode", ["Weekly", "Monthly"], horizontal=True, label_visibility="collapsed")
-    with c2:
-        st.markdown('<div class="small-label">Pick date inside period</div>', unsafe_allow_html=True)
-        anchor = st.date_input("anchor", value=date.today(), label_visibility="collapsed")
-    st.markdown("</div>", unsafe_allow_html=True)
-
-    st.markdown("</div>", unsafe_allow_html=True)
-
-    # Filters
-    if len(df):
-        departments = ["ALL"] + sorted(df["department"].dropna().unique().tolist())
-        statuses = ["ALL", "Planned", "In Progress", "Done", "On Hold", "Cancelled"]
-        types = ["ALL"] + sorted(df["task_type"].dropna().unique().tolist())
-    else:
-        departments, statuses, types = ["ALL"], ["ALL"], ["ALL"]
-
-    f1, f2, f3 = st.columns(3)
-    dep = f1.selectbox("Department", departments, key="kpi_dep")
-    stt = f2.selectbox("Status", statuses, key="kpi_status")
-    ttype = f3.selectbox("Task type", types, key="kpi_type")
-
-    # Apply filters
-    view = df.copy()
-
-    if q and q.strip() and len(view):
-        s = q.strip().lower()
-
-        def _hit(r):
-            txt = " ".join(
-                [
-                    safe_str(r.get("wo_number")),
-                    safe_str(r.get("station")),
-                    safe_str(r.get("location")),
-                    safe_str(r.get("department")),
-                    safe_str(r.get("task_type")),
-                    safe_str(r.get("asset_tag")),
-                    safe_str(r.get("assigned_to")),
-                    safe_str(r.get("notes")),
-                ]
-            ).lower()
-            return s in txt
-
-        view = view[view.apply(_hit, axis=1)]
-
-    if dep != "ALL" and len(view):
-        view = view[view["department"] == dep]
-    if stt != "ALL" and len(view):
-        view = view[view["status"] == stt]
-    if ttype != "ALL" and len(view):
-        view = view[view["task_type"] == ttype]
-
-    start, end = period_range(mode, anchor)
-
-    # PM-only toggle
-    pm_only = st.checkbox("PM tasks only", value=True, key="kpi_pm_only")
-
-    kpi_df = view.copy()
-    if pm_only and len(kpi_df):
-        kpi_df = kpi_df[kpi_df.apply(is_pm_task, axis=1)]
-
-    def in_period(d: Optional[date]) -> bool:
-        return bool(d and start <= d <= end)
-
-    # Planned = due_date in period (PM compliance)
-    planned = 0
-    done = 0
-    on_time = 0
-    backlog = 0
-    overdue = int(kpi_df["is_overdue"].sum()) if len(kpi_df) else 0
-
-    if len(kpi_df):
-        planned_mask = kpi_df.apply(lambda r: in_period(parse_date(r.get("due_date"))), axis=1).astype(bool)
-        planned = int(planned_mask.to_numpy().sum())
-
-        done_mask = kpi_df.apply(
-            lambda r: (r.get("status") == "Done") and in_period(parse_date(r.get("completed_date"))),
-            axis=1,
-        ).astype(bool)
-        done = int(done_mask.to_numpy().sum())
-
-        on_time_mask = kpi_df.apply(
-            lambda r: (r.get("status") == "Done")
-                      and in_period(parse_date(r.get("completed_date")))
-                      and date_leq(parse_date(r.get("completed_date")), parse_date(r.get("due_date"))),
-            axis=1,
-        ).astype(bool)
-        on_time = int(on_time_mask.to_numpy().sum())
-
-        backlog_mask = kpi_df.apply(
-            lambda r: (r.get("status") not in ["Done", "Cancelled"])
-                      and (parse_date(r.get("due_date")) is not None)
-                      and (parse_date(r.get("due_date")) < start),
-            axis=1,
-        ).astype(bool)
-        backlog = int(backlog_mask.to_numpy().sum())
-
-    compliance = int(round((on_time / planned) * 100, 0)) if planned > 0 else 0
-
-    st.caption(f"Period: {start.strftime('%Y-%m-%d')} → {end.strftime('%Y-%m-%d')}")
-    kpi_cards(planned=planned, done=done, overdue=overdue, rate=compliance)
-
-    # Extra KPI row (Backlog + On-time count)
-    st.markdown(
-        f"""
-    <div class="kpi-row">
-      <div class="kpi-card">
-        <div class="kpi-title">On-Time Completed</div>
-        <div class="kpi-value">{on_time}</div>
-        <div class="kpi-sub">Completed ≤ Due Date</div>
-      </div>
-      <div class="kpi-card">
-        <div class="kpi-title">Backlog</div>
-        <div class="kpi-value">{backlog}</div>
-        <div class="kpi-sub">Due before period</div>
-      </div>
-    </div>
-    """,
-        unsafe_allow_html=True,
-    )
-
-    # Compliance breakdown
-    st.subheader("PM Compliance breakdown")
-    if len(kpi_df):
-        tmp = kpi_df.copy()
-        tmp["due_dt"] = tmp["due_date"].apply(parse_date)
-        tmp["comp_dt"] = tmp["completed_date"].apply(parse_date)
-
-        tmp_period = tmp[tmp["due_dt"].apply(lambda d: in_period(d))]
-        if len(tmp_period):
-            tmp_period = tmp_period.copy()
-            tmp_period["planned_pm"] = 1
-            tmp_period["done_ontime"] = tmp_period.apply(
-                lambda r: 1
-                if (
-                    r.get("status") == "Done"
-                    and r["comp_dt"]
-                    and r["due_dt"]
-                    and r["comp_dt"] <= r["due_dt"]
-                )
-                else 0,
-                axis=1,
-            )
-            g = (
-                tmp_period.groupby(["department", "station"], dropna=False)[["planned_pm", "done_ontime"]]
-                .sum()
-                .reset_index()
-            )
-            g["compliance_%"] = (g["done_ontime"] / g["planned_pm"] * 100).round(0).astype(int)
-            g = g.sort_values(["compliance_%", "planned_pm"], ascending=[True, False])
-            st.dataframe(g, use_container_width=True, hide_index=True)
-        else:
-            st.info("No PM planned in this period.")
-    else:
-        st.info("No tasks.")
-
-    # Overdue / Due Soon (ALWAYS visible, not inside wrong else)
-    st.subheader("Overdue / Due Soon")
-    soon_days = 14
-
-    def due_days_left(r):
-        if r.get("status") in ["Done", "Cancelled"]:
-            return None
-        dd = parse_date(r.get("due_date"))
-        if not dd:
-            return None
-        return (dd - date.today()).days
-
-    if len(view):
-        tmp2 = view.copy()
-        tmp2["due_in_days"] = tmp2.apply(due_days_left, axis=1)
-
-        def bucket(d):
-            if d is None:
-                return 9
-            if d < 0:
-                return 1
-            if d <= soon_days:
-                return 2
-            return 3
-
-        tmp2["bucket"] = tmp2["due_in_days"].apply(bucket)
-        tmp2 = tmp2.sort_values(["bucket", "due_in_days"], ascending=[True, True])
-
-        show_cols = [
-            "wo_number",
-            "station",
-            "location",
-            "department",
-            "task_type",
-            "asset_tag",
-            "status",
-            "assigned_to",
-            "planned_date",
-            "due_date",
-            "completed_date",
-            "due_in_days",
-        ]
-        st.dataframe(tmp2[show_cols], use_container_width=True, hide_index=True)
-    else:
-        st.info("No tasks to show.")
 
 # -----------------------------
-# Tab 2: Add / Edit
+# Tab: Work Orders & Compliance
 # -----------------------------
-with tab2:
-    st.subheader("Add New Task (Work Order based)")
-    with st.form("add_task_form", clear_on_submit=True):
-        c1, c2, c3 = st.columns(3)
-        wo = c1.text_input("Work Order Number (WO)", placeholder="e.g., 4500xxxxx")
-        station = c2.text_input("Station", placeholder="e.g., BCS-01")
-        location = c3.text_input("Location / Area", placeholder="e.g., BCS")
+with tab_wo:
+    st.subheader("Work Orders Compliance (Weekly / Monthly)")
 
-        c4, c5, c6 = st.columns(3)
-        department = c4.selectbox(
-            "Department",
-            ["Instrument", "Electrical", "Mechanical", "Network", "Facility", "Operation"],
-        )
-        task_type = c5.text_input("Task Type", placeholder="e.g., PM / Calibration / F&G")
-        asset_tag = c6.text_input("Asset Tag (optional)", placeholder="e.g., PT-101 / GC-01 / FGD-22")
+    # =========================
+    # 📥 SAP Import (CSV / Excel)
+    # =========================
+    st.markdown("### 📥 Import Work Orders from SAP (CSV / Excel)")
+    sap_file = st.file_uploader("Upload SAP export file", type=["csv", "xlsx"], key="sap_upload")
 
-        c7, c8, c9 = st.columns(3)
-        planned_date_val = c7.date_input("Planned Date", value=date.today())
-        due_date_val = c8.date_input("Due Date", value=date.today())
-        status = c9.selectbox("Status", ["Planned", "In Progress", "Done", "On Hold", "Cancelled"])
+    def norm_col(s: str) -> str:
+        return str(s).strip().lower().replace(" ", "").replace("_", "").replace("-", "")
 
-        assigned_to = st.text_input("Assigned To", placeholder="e.g., Omar")
-        completed_date = st.text_input(
-            "Completed Date (YYYY-MM-DD)",
-            value="" if status != "Done" else today_str(),
-        )
-        notes = st.text_area("Notes")
+    def find_col(cols, candidates):
+        cols_norm = {norm_col(c): c for c in cols}
+        for cand in candidates:
+            key = norm_col(cand)
+            if key in cols_norm:
+                return cols_norm[key]
+        return None
 
-        submit = st.form_submit_button("Save Task")
+    def upsert_work_orders_from_df(df_import: pd.DataFrame) -> int:
+        cols = df_import.columns
 
-        if submit:
-            if not wo.strip() or not station.strip() or not task_type.strip():
-                st.error("WO Number, Station, and Task Type are required.")
-                st.stop()
+        col_wo = find_col(cols, ["AUFNR", "order", "order number", "wo", "work order", "workorder", "ordernumber"])
+        col_station = find_col(cols, ["TPLNR", "functional location", "functionallocation", "station", "equipment", "eqnr"])
+        col_loc = find_col(cols, ["KTEXT", "short text", "shorttext", "description", "location text", "locationtext"])
+        col_due = find_col(cols, ["GLTRP", "Latest Allowable End Date", "basic finish", "basicfinish", "due date", "duedate", "required end", "req.end"])
+        col_pri = find_col(cols, ["PRIOK", "priority", "prio", "pri"])
+        col_hours = find_col(cols, ["ARBEIT", "planned work", "plannedwork", "work", "est hours", "estimated hours", "esthours"])
 
-            # Validate completed_date
-            if completed_date.strip():
-                try:
-                    parse_date(completed_date.strip())
-                except Exception:
-                    st.error("Completed Date format must be YYYY-MM-DD")
-                    st.stop()
+        missing = []
+        if not col_wo:
+            missing.append("WO Number (AUFNR)")
+        if not col_station:
+            missing.append("Station / Functional Location (TPLNR)")
+        if not col_due:
+            missing.append("Due Date (GLTRP / Basic finish)")
+        if missing:
+            raise ValueError("Missing required columns in SAP export: " + ", ".join(missing))
 
-            task_id = insert_task(
-                {
-                    "wo_number": wo.strip(),
-                    "station": station.strip(),
-                    "location": location.strip() if location.strip() else None,
-                    "department": department,
-                    "task_type": task_type.strip(),
-                    "asset_tag": asset_tag.strip() if asset_tag.strip() else None,
-                    "planned_date": planned_date_val.strftime("%Y-%m-%d"),
-                    "due_date": due_date_val.strftime("%Y-%m-%d"),
-                    "status": status,
-                    "assigned_to": assigned_to.strip() if assigned_to.strip() else None,
-                    "completed_date": completed_date.strip() if completed_date.strip() else None,
-                    "notes": notes.strip() if notes.strip() else None,
-                }
+        df = df_import.copy()
+        df["wo_number"] = df[col_wo].astype(str).str.strip()
+        df["station"] = df[col_station].astype(str).str.strip()
+        df["location"] = df[col_loc].astype(str).str.strip() if col_loc else None
+        df["due_date"] = pd.to_datetime(df[col_due], errors="coerce").dt.strftime("%Y-%m-%d")
+
+        df["priority"] = pd.to_numeric(df[col_pri], errors="coerce").fillna(99).astype(int) if col_pri else 99
+        df["est_hours"] = pd.to_numeric(df[col_hours], errors="coerce").fillna(1.0).astype(float) if col_hours else 1.0
+
+        df["task_type"] = "PM"
+        df["status"] = "Planned"
+
+        df = df[df["wo_number"].str.len() > 0]
+        df = df[df["station"].str.len() > 0]
+        df = df[df["due_date"].notna()]
+
+        ensure_work_orders_table()
+        conn = get_conn()
+        cur = conn.cursor()
+
+        sql = """
+        INSERT INTO work_orders
+          (wo_number, station, location, task_type, priority, est_hours, due_date, status, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+        ON CONFLICT(wo_number) DO UPDATE SET
+          station=excluded.station,
+          location=excluded.location,
+          task_type=excluded.task_type,
+          priority=excluded.priority,
+          est_hours=excluded.est_hours,
+          due_date=excluded.due_date,
+          updated_at=datetime('now');
+        """
+
+        count = 0
+        for _, r in df.iterrows():
+            cur.execute(
+                sql,
+                (
+                    r["wo_number"],
+                    r["station"],
+                    r["location"],
+                    r["task_type"],
+                    int(r["priority"]),
+                    float(r["est_hours"]),
+                    r["due_date"],
+                    r["status"],
+                ),
             )
-            st.success(f"Saved. Task ID: {task_id}")
-            st.rerun()
+            count += 1
+
+        conn.commit()
+        conn.close()
+        return count
+
+    if sap_file is not None:
+        try:
+            df_imp = pd.read_csv(sap_file) if sap_file.name.lower().endswith(".csv") else pd.read_excel(sap_file)
+            st.write("Preview (first 20 rows):")
+            st.dataframe(df_imp.head(20), use_container_width=True)
+
+            if st.button("✅ Import / Update from SAP file", key="btn_import_sap"):
+                n = upsert_work_orders_from_df(df_imp)
+                st.success(f"Imported/Updated {n} work orders.")
+                st.rerun()
+
+        except Exception as e:
+            st.error(str(e))
 
     st.divider()
-    st.subheader("Edit Existing Task")
 
-    df2 = fetch_tasks()
+    # =========================
+    # Compliance (Weekly/Monthly)
+    # =========================
+    df = fetch_work_orders()
+
+    st.markdown('<div class="control-bar">', unsafe_allow_html=True)
+
+    st.markdown('<div class="control-box">', unsafe_allow_html=True)
+    st.markdown('<div class="small-label">Mode</div>', unsafe_allow_html=True)
+    mode = st.radio("Mode", ["Weekly", "Monthly"], horizontal=True, label_visibility="collapsed", key="wo_mode")
+    st.markdown('</div>', unsafe_allow_html=True)
+
+    st.markdown('<div class="control-box">', unsafe_allow_html=True)
+    st.markdown('<div class="small-label">Pick date inside period</div>', unsafe_allow_html=True)
+    anchor = st.date_input("Pick date", value=date.today(), label_visibility="collapsed", key="wo_anchor")
+    st.markdown('</div>', unsafe_allow_html=True)
+
+    st.markdown('<div class="control-box">', unsafe_allow_html=True)
+    st.markdown('<div class="small-label">Filter</div>', unsafe_allow_html=True)
+    pm_only = st.checkbox("PM work orders only", value=True, key="wo_pm_only")
+    st.markdown('</div>', unsafe_allow_html=True)
+
+    st.markdown('</div>', unsafe_allow_html=True)
+
+    start, end = period_range_ymd(mode, anchor)
+    st.caption(f"Period: {start} → {end}")
+
+    if len(df) == 0:
+        st.info("No work orders yet. Import from SAP above or add manually below.")
+    else:
+        view = df.copy()
+
+        if pm_only and "task_type" in view.columns:
+            view = view[view["task_type"].fillna("").str.lower().str.contains("pm")]
+
+        view["due_dt"] = view["due_date"].apply(parse_date_ymd)
+        view["comp_dt"] = view["completed_date"].apply(parse_date_ymd)
+
+        def in_period(d: Optional[date]) -> bool:
+            return bool(d and start <= d <= end)
+
+        planned = int(view["due_dt"].apply(in_period).sum())
+        done = int(view.apply(lambda r: r.get("status") == "Done" and in_period(r["comp_dt"]), axis=1).sum())
+        on_time = int(
+            view.apply(
+                lambda r: (r.get("status") == "Done")
+                          and in_period(r["comp_dt"])
+                          and (r["due_dt"] is not None)
+                          and (r["comp_dt"] is not None)
+                          and (r["comp_dt"] <= r["due_dt"]),
+                axis=1,
+            ).sum()
+        )
+        overdue = int(
+            view.apply(
+                lambda r: (r.get("status") not in ["Done", "Cancelled"])
+                          and (r["due_dt"] is not None)
+                          and (r["due_dt"] < date.today()),
+                axis=1,
+            ).sum()
+        )
+        compliance = int(round((on_time / planned) * 100, 0)) if planned > 0 else 0
+
+        st.markdown(
+            f"""
+            <div class="kpi-row">
+              <div class="kpi-card"><div class="kpi-title">Planned</div><div class="kpi-value">{planned}</div><div class="kpi-sub">Due in period</div></div>
+              <div class="kpi-card"><div class="kpi-title">Done</div><div class="kpi-value">{done}</div><div class="kpi-sub">Completed in period</div></div>
+              <div class="kpi-card"><div class="kpi-title">Overdue</div><div class="kpi-value">{overdue}</div><div class="kpi-sub">Past due date</div></div>
+              <div class="kpi-card"><div class="kpi-title">Compliance</div><div class="kpi-value">{compliance}%</div><div class="kpi-sub">On-time / Planned</div></div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+        st.divider()
+
+        # ---- Plan map (PRIVATE plan from wo_plans) for this period ----
+        ensure_planning_tables()
+        plans = fetch_plans_in_period(start.strftime("%Y-%m-%d"), end.strftime("%Y-%m-%d"))
+        plan_map = {int(r["wo_id"]): r for _, r in plans.iterrows()}
+
+        # =========================
+        # Modern weekly board (DUE date)
+        # =========================
+        if mode == "Weekly":
+            st.subheader("Weekly Plan Layout (Based on DUE Date)")
+            week_days = [start + timedelta(days=i) for i in range(7)]
+            cols = st.columns(7)
+
+            for i in range(7):
+                d = week_days[i]
+                day_df = view[view["due_dt"] == d].copy()
+
+                # sort: status rank then station then priority
+                if len(day_df):
+                    def _rank_status(stt: str) -> int:
+                        if stt == "Planned":
+                            return 1
+                        if stt == "In Progress":
+                            return 2
+                        if stt == "Done":
+                            return 4
+                        return 3
+
+                    day_df["rank"] = day_df["status"].astype(str).apply(_rank_status)
+                    day_df = day_df.sort_values(["rank", "priority", "station", "wo_number"], ascending=[True, True, True, True])
+
+                with cols[i]:
+                    st.markdown(
+                        f'<div class="day-col-title">{DAYS7[i]}<span class="day-chip">({d.strftime("%d %b")})</span></div>',
+                        unsafe_allow_html=True
+                    )
+
+                    if len(day_df) == 0:
+                        st.caption("— no items —")
+                        continue
+
+                    for _, r in day_df.iterrows():
+                        stt = str(r.get("status") or "Planned")
+                        if stt == "Done":
+                            badge = '<span class="badge badge-done">Done</span>'
+                        elif stt == "In Progress":
+                            badge = '<span class="badge badge-prog">In Progress</span>'
+                        elif stt == "Planned":
+                            badge = '<span class="badge badge-plan">Planned</span>'
+                        else:
+                            badge = f'<span class="badge">{stt}</span>'
+
+                        over_badge = ""
+                        if r.get("status") not in ["Done", "Cancelled"] and r.get("due_dt") and r["due_dt"] < date.today():
+                            over_badge = ' <span class="badge badge-over">Overdue</span>'
+
+                        p = plan_map.get(int(r["id"]))
+                        if p is not None:
+                            who = f"{p['tech_1']}" + (f" + {p['tech_2']}" if p.get("tech_2") else "")
+                            mode_badge = ' <span class="badge badge-auto">Auto</span>' if str(p.get("mode")) == "Auto" else ""
+                            plan_line = f"<br/>Planned: <b>{who}</b>{mode_badge}"
+                        else:
+                            plan_line = "<br/>Planned: <span class='badge'>Not planned</span>"
+
+                        st.markdown(
+                            f"""
+                            <div class="card">
+                              <div class="card-title">
+                                WO {safe_str(r.get('wo_number'), '')} {badge}{over_badge}
+                              </div>
+                              <div class="card-sub">
+                                <b>{safe_str(r.get('station'))}</b> • {safe_str(r.get('location'))}<br/>
+                                Type: {safe_str(r.get('task_type'))} • P{safe_str(r.get('priority'))} • {safe_str(r.get('est_hours'))}h
+                                {plan_line}
+                              </div>
+                            </div>
+                            """,
+                            unsafe_allow_html=True
+                        )
+
+            st.caption("This board is based on **SAP Due Date**. Your private manpower plan shows under each card.")
+
+        else:
+            st.subheader("Monthly List")
+            tmp = view[view["due_dt"].apply(in_period)].copy()
+            tmp = tmp.sort_values(["due_dt", "status", "priority", "station", "wo_number"], ascending=[True, True, True, True, True])
+            show_cols = [
+                "wo_number", "station", "location", "task_type", "priority", "est_hours", "status",
+                "assigned_to", "planned_date", "due_date", "completed_date", "notes"
+            ]
+            st.dataframe(tmp[[c for c in show_cols if c in tmp.columns]], use_container_width=True, hide_index=True)
+
+    st.divider()
+
+    # =========================
+    # Add New Work Order
+    # =========================
+    st.subheader("Add New Work Order")
+    with st.form("add_wo_form", clear_on_submit=True):
+        c1, c2, c3 = st.columns(3)
+        wo_number = c1.text_input("WO Number", placeholder="e.g., 4500xxxxx")
+        station = c2.text_input("Station", placeholder="e.g., BCS-01")
+        location = c3.text_input("Location", placeholder="optional")
+
+        c4, c5, c6 = st.columns(3)
+        task_type = c4.text_input("Task Type", value="PM", placeholder="PM / Calibration / F&G")
+        status = c5.selectbox("Status", ["Planned", "In Progress", "Done", "Cancelled"])
+        assigned_to = c6.text_input("Assigned To (optional)", placeholder="(SAP field)")
+
+        c7, c8, c9 = st.columns(3)
+        priority = c7.number_input("Priority (1 = highest)", min_value=1, max_value=99, value=3, step=1)
+        est_hours = c8.number_input("Estimated Hours", min_value=0.25, max_value=200.0, value=1.0, step=0.25)
+        planned_date = c9.date_input("Planned Date (optional)", value=date.today())
+
+        c10, c11 = st.columns(2)
+        due_date = c10.date_input("Due Date", value=date.today())
+        completed_date = c11.text_input("Completed Date (YYYY-MM-DD)", value="" if status != "Done" else date.today().strftime("%Y-%m-%d"))
+
+        notes = st.text_area("Notes", placeholder="Details / WO notes")
+        save = st.form_submit_button("Save WO")
+
+        if save:
+            if not wo_number.strip() or not station.strip():
+                st.error("WO Number and Station are required.")
+                st.stop()
+
+            if completed_date.strip():
+                try:
+                    _ = parse_date_ymd(completed_date.strip())
+                except Exception:
+                    st.error("Completed Date must be YYYY-MM-DD")
+                    st.stop()
+
+            try:
+                new_id = insert_work_order(
+                    {
+                        "wo_number": wo_number.strip(),
+                        "station": station.strip(),
+                        "location": location.strip() if location.strip() else None,
+                        "task_type": task_type.strip() if task_type.strip() else "PM",
+                        "priority": int(priority),
+                        "est_hours": float(est_hours),
+                        "planned_date": planned_date.strftime("%Y-%m-%d") if planned_date else None,
+                        "due_date": due_date.strftime("%Y-%m-%d") if due_date else None,
+                        "status": status,
+                        "assigned_to": assigned_to.strip() if assigned_to.strip() else None,
+                        "completed_date": completed_date.strip() if completed_date.strip() else None,
+                        "notes": notes.strip() if notes else None,
+                    }
+                )
+                st.success(f"Saved WO (ID: {new_id})")
+                st.rerun()
+            except Exception as e:
+                st.error(str(e))
+
+    st.divider()
+
+    # =========================
+    # Edit Work Order
+    # =========================
+    st.subheader("Edit Work Order")
+    df2 = fetch_work_orders()
     if len(df2) == 0:
-        st.info("No tasks yet.")
+        st.info("No work orders to edit.")
     else:
         df2 = df2.copy()
         df2["display"] = df2.apply(
-            lambda r: f"ID:{r['id']} | WO:{r['wo_number']} | {r['station']} | {r['task_type']} | {r['status']}",
-            axis=1,
+            lambda r: f"ID:{r['id']} | WO:{r['wo_number']} | {r['station']} | {r['task_type']} | P{r.get('priority',99)} | {r['status']}",
+            axis=1
         )
-        pick = st.selectbox("Pick task", df2["display"].tolist(), key="edit_pick")
+        pick = st.selectbox("Pick WO", df2["display"].tolist(), key="edit_wo_pick")
         row = df2[df2["display"] == pick].iloc[0]
-        task_id = int(row["id"])
+        wo_id = int(row["id"])
 
-        with st.form("edit_task_form"):
+        with st.form("edit_wo_form"):
             c1, c2, c3 = st.columns(3)
-            wo = c1.text_input("WO", value=safe_str(row.get("wo_number"), ""))
-            station = c2.text_input("Station", value=safe_str(row.get("station"), ""))
-            location = c3.text_input("Location", value=safe_str(row.get("location"), ""))
+            wo_number = c1.text_input("WO Number", value=str(row.get("wo_number") or ""))
+            station = c2.text_input("Station", value=str(row.get("station") or ""))
+            location = c3.text_input("Location", value=str(row.get("location") or ""))
 
             c4, c5, c6 = st.columns(3)
-            department = c4.text_input("Department", value=safe_str(row.get("department"), "Instrument"))
-            task_type = c5.text_input("Task Type", value=safe_str(row.get("task_type"), ""))
-            asset_tag = c6.text_input("Asset Tag", value=safe_str(row.get("asset_tag"), ""))
+            task_type = c4.text_input("Task Type", value=str(row.get("task_type") or "PM"))
+            priority = c5.number_input("Priority (1 = highest)", min_value=1, max_value=99, value=int(row.get("priority") or 99), step=1)
+            est_hours = c6.number_input("Estimated Hours", min_value=0.25, max_value=200.0, value=float(row.get("est_hours") or 1.0), step=0.25)
 
             c7, c8, c9 = st.columns(3)
-            planned_date = c7.text_input("Planned Date (YYYY-MM-DD)", value=safe_str(row.get("planned_date"), ""))
-            due_date = c8.text_input("Due Date (YYYY-MM-DD)", value=safe_str(row.get("due_date"), ""))
-
-            status_list = ["Planned", "In Progress", "Done", "On Hold", "Cancelled"]
-            current_status = safe_str(row.get("status"), "Planned")
+            status_list = ["Planned", "In Progress", "Done", "Cancelled"]
+            current_status = str(row.get("status") or "Planned")
             status_idx = status_list.index(current_status) if current_status in status_list else 0
-            status = c9.selectbox("Status", status_list, index=status_idx)
+            status = c7.selectbox("Status", status_list, index=status_idx)
+            assigned_to = c8.text_input("Assigned To (optional)", value=str(row.get("assigned_to") or ""))
+            planned_date = c9.text_input("Planned Date (YYYY-MM-DD)", value=str(row.get("planned_date") or ""))
 
-            assigned_to = st.text_input("Assigned To", value=safe_str(row.get("assigned_to"), ""))
-            completed_date = st.text_input("Completed Date (YYYY-MM-DD)", value=safe_str(row.get("completed_date"), ""))
-            notes = st.text_area("Notes", value=safe_str(row.get("notes"), ""))
+            c10, c11 = st.columns(2)
+            due_date = c10.text_input("Due Date (YYYY-MM-DD)", value=str(row.get("due_date") or ""))
+            completed_date = c11.text_input("Completed Date (YYYY-MM-DD)", value=str(row.get("completed_date") or ""))
+
+            notes = st.text_area("Notes", value=str(row.get("notes") or ""))
 
             save = st.form_submit_button("Save Changes")
             if save:
-                if not wo.strip() or not station.strip() or not task_type.strip():
-                    st.error("WO, Station, Task Type are required.")
-                    st.stop()
-
                 try:
                     if planned_date.strip():
-                        parse_date(planned_date.strip())
+                        _ = parse_date_ymd(planned_date.strip())
                     if due_date.strip():
-                        parse_date(due_date.strip())
+                        _ = parse_date_ymd(due_date.strip())
                     if completed_date.strip():
-                        parse_date(completed_date.strip())
+                        _ = parse_date_ymd(completed_date.strip())
                 except Exception:
-                    st.error("Date format must be YYYY-MM-DD")
+                    st.error("Date must be YYYY-MM-DD")
                     st.stop()
 
-                update_task(
-                    task_id,
+                update_work_order(
+                    wo_id,
                     {
-                        "wo_number": wo.strip(),
+                        "wo_number": wo_number.strip(),
                         "station": station.strip(),
                         "location": location.strip() if location.strip() else None,
-                        "department": department.strip(),
-                        "task_type": task_type.strip(),
-                        "asset_tag": asset_tag.strip() if asset_tag.strip() else None,
+                        "task_type": task_type.strip() if task_type.strip() else "PM",
+                        "priority": int(priority),
+                        "est_hours": float(est_hours),
                         "planned_date": planned_date.strip() if planned_date.strip() else None,
                         "due_date": due_date.strip() if due_date.strip() else None,
                         "status": status,
@@ -1585,167 +1734,351 @@ with tab2:
                 st.success("Updated.")
                 st.rerun()
 
-# -----------------------------
-# Tab 3: Attachments
-# -----------------------------
-with tab3:
-    df3 = fetch_tasks()
-    if len(df3) == 0:
-        st.info("Add tasks first.")
-    else:
-        df3 = df3.copy()
-        df3["display"] = df3.apply(
-            lambda r: f"ID:{r['id']} | WO:{r['wo_number']} | {r['station']} | {r['task_type']}",
-            axis=1,
-        )
-        pick = st.selectbox("Pick task", df3["display"].tolist(), key="att_pick")
-        row = df3[df3["display"] == pick].iloc[0]
-        task_id = int(row["id"])
 
-        st.write(
-            f"**Task:** ID {task_id} | WO {row['wo_number']} | {row['station']} | "
-            f"{row['task_type']} | {row['status']}"
-        )
+# -----------------------------
+# Tab: Weekly Planner (Private Plan in wo_plans)
+# -----------------------------
+with tab_weekly:
+    ensure_planning_tables()
+    st.subheader("Weekly Planner (Private) — Manual + Auto (1–2 Tech per WO)")
 
-        st.subheader("Upload attachment")
-        with st.form("upload_attach"):
-            file = st.file_uploader("Attachment (photo/pdf/etc.)", type=None)
-            ok = st.form_submit_button("Upload")
-            if ok:
-                if file is None:
-                    st.error("Please choose a file.")
-                else:
-                    safe_name = f"task{task_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{file.name}"
-                    dest = UPLOAD_DIR / safe_name
-                    dest.write_bytes(file.getbuffer())
-                    add_attachment(task_id, str(dest))
-                    st.success("Uploaded.")
+    # ---- Tech master list ----
+    st.markdown("### Technicians (Instrument)")
+    techs = fetch_technicians("Instrument")
+
+    cA, cB = st.columns([1.2, 1])
+    with cA:
+        with st.form("add_tech_form", clear_on_submit=True):
+            new_name = st.text_input("Add technician name")
+            add_btn = st.form_submit_button("Add")
+            if add_btn:
+                try:
+                    add_technician(new_name, "Instrument")
+                    st.success("Added.")
                     st.rerun()
-
-        st.divider()
-        st.subheader("Attachments list")
-        att = fetch_attachments(task_id)
-        if len(att) == 0:
-            st.info("No attachments yet.")
-        else:
-            for i, rr in att.iterrows():
-                path = rr["file_path"]
-                with st.expander(f"📎 {rr['uploaded_at']} — {Path(path).name}"):
-                    show_attachment(path, key_prefix=f"t{task_id}_{i}")
-
-# -----------------------------
-# Tab 4: Validation
-# -----------------------------
-with tab4:
-    st.subheader("Validation Dashboard")
-
-    vdf = fetch_validations()
-    if len(vdf) == 0:
-        st.info("No validations yet. Add first below.")
-    else:
-        c1, c2, c3 = st.columns(3)
-        vtype = c1.selectbox("Validation Type", ["ALL", "FMS", "GC", "PRT"], key="v_type")
-        cust = c2.selectbox(
-            "Customer",
-            ["ALL"] + sorted(vdf["customer_name"].dropna().unique().tolist()),
-            key="v_cust",
-        )
-        vstatus = c3.selectbox(
-            "Status",
-            ["ALL", "Planned", "In Progress", "Done", "Failed", "Cancelled"],
-            key="v_status",
-        )
-
-        viewv = vdf.copy()
-        if vtype != "ALL":
-            viewv = viewv[viewv["validation_type"] == vtype]
-        if cust != "ALL":
-            viewv = viewv[viewv["customer_name"] == cust]
-        if vstatus != "ALL":
-            viewv = viewv[viewv["status"] == vstatus]
-
-        planned_v = int((viewv["status"].isin(["Planned", "In Progress"])).sum())
-        done_v = int((viewv["status"] == "Done").sum())
-        failed_v = int((viewv["status"] == "Failed").sum())
-
-        def is_overdue_val(r):
-            if r.get("status") in ["Done", "Cancelled"]:
-                return False
-            dd = parse_date(r.get("due_date"))
-            return bool(dd and dd < date.today())
-
-        viewv = viewv.copy()
-        viewv["is_overdue"] = viewv.apply(is_overdue_val, axis=1)
-        overdue_v = int(viewv["is_overdue"].sum())
-
-        st.markdown(
-            f"""
-        <div class="kpi-row">
-          <div class="kpi-card"><div class="kpi-title">Open</div><div class="kpi-value">{planned_v}</div><div class="kpi-sub">Planned + In Progress</div></div>
-          <div class="kpi-card"><div class="kpi-title">Done</div><div class="kpi-value">{done_v}</div><div class="kpi-sub">Completed</div></div>
-          <div class="kpi-card"><div class="kpi-title">Failed</div><div class="kpi-value">{failed_v}</div><div class="kpi-sub">Requires action</div></div>
-          <div class="kpi-card"><div class="kpi-title">Overdue</div><div class="kpi-value">{overdue_v}</div><div class="kpi-sub">Past due date</div></div>
-        </div>
-        """,
-            unsafe_allow_html=True,
-        )
-
-        st.subheader("List")
-        show_cols = [
-            "customer_name",
-            "validation_type",
-            "station",
-            "asset_tag",
-            "planned_date",
-            "due_date",
-            "status",
-            "result",
-            "report_no",
-            "notes",
-        ]
-        st.dataframe(viewv[show_cols], use_container_width=True, hide_index=True)
+                except Exception as e:
+                    st.error(str(e))
+    with cB:
+        st.caption(f"Active: {', '.join(techs) if techs else 'None'}")
 
     st.divider()
-    st.subheader("Add New Validation (FMS / GC / PRT)")
 
-    with st.form("add_validation_form", clear_on_submit=True):
-        c1, c2, c3 = st.columns(3)
-        customer_name = c1.text_input("Customer Name", placeholder="e.g., Customer A")
-        validation_type = c2.selectbox("Validation Type", ["FMS", "GC", "PRT"])
-        station = c3.text_input("Station", placeholder="e.g., BCS-01")
+    df = fetch_work_orders()
+    if len(df) == 0:
+        st.info("No work orders available.")
+        st.stop()
 
-        c4, c5, c6 = st.columns(3)
-        asset_tag = c4.text_input("Asset Tag", placeholder="optional")
-        planned_date = c5.date_input("Planned Date", value=date.today())
-        due_date = c6.date_input("Due Date", value=date.today())
+    # Exclude closed WOs
+    df_open = df[~df["status"].isin(["Done", "Cancelled"])].copy()
 
-        c7, c8, c9 = st.columns(3)
-        status = c7.selectbox("Status", ["Planned", "In Progress", "Done", "Failed", "Cancelled"])
-        result = c8.selectbox("Result", ["NA", "Pass", "Fail"])
-        report_no = c9.text_input("Report No", placeholder="optional")
+    pm_only = st.checkbox("PM only", value=True, key="planner_pm_only")
+    if pm_only:
+        df_open = df_open[df_open["task_type"].fillna("").str.lower().str.contains("pm")]
 
-        notes = st.text_area("Notes")
+    anchor = st.date_input("Pick a date inside the week", value=date.today(), key="planner_anchor")
+    ws = week_start_sunday(anchor)
+    we = ws + timedelta(days=6)
+    st.caption(f"Week: {ws} → {we} (Work days: Sun–Thu)")
 
-        save_val = st.form_submit_button("Save Validation")
-        if save_val:
-            if not customer_name.strip():
-                st.error("Customer Name is required.")
-                st.stop()
+    # ---- Auto plan controls ----
+    st.markdown("### ⚡ Auto Plan (Balanced across Sun–Thu)")
+    max_per_day = st.number_input("Max tasks per technician per day", min_value=1, value=2, step=1)
+    two_tech_default = st.checkbox("Auto assign 2 technicians per WO", value=False)
 
-            insert_validation(
-                {
-                    "customer_name": customer_name.strip(),
-                    "validation_type": validation_type,
-                    "station": station.strip() if station.strip() else None,
-                    "asset_tag": asset_tag.strip() if asset_tag.strip() else None,
-                    "planned_date": planned_date.strftime("%Y-%m-%d") if planned_date else None,
-                    "due_date": due_date.strftime("%Y-%m-%d") if due_date else None,
-                    "status": status,
-                    "result": result,
-                    "report_no": report_no.strip() if report_no.strip() else None,
-                    "notes": notes.strip() if notes.strip() else None,
-                }
+    # pick WOs for this week based on DUE date inside week
+    df_open["due_dt"] = df_open["due_date"].apply(parse_date_ymd)
+    wos_this_week = df_open[df_open["due_dt"].apply(lambda d: bool(d and ws <= d <= we))].copy()
+
+    if st.button("Auto Plan This Week", key="btn_auto_plan_week"):
+        if not techs:
+            st.error("Add technicians first.")
+        elif len(wos_this_week) == 0:
+            st.warning("No open work orders with DUE dates inside this week.")
+        else:
+            auto_assign_week(
+                work_orders_df=wos_this_week,
+                techs=techs,
+                start=ws,
+                end=we,
+                max_per_tech_per_day=int(max_per_day),
+                two_tech_default=two_tech_default,
             )
-            st.success("Saved.")
+            st.success("Auto plan saved to wo_plans.")
             st.rerun()
->>>>>>> 10e4590 (synce with changes in codes)
+
+    st.divider()
+
+    # ---- Manual plan per WO ----
+    st.markdown("### ✍️ Manual Plan (Select WO → choose day + 1–2 tech)")
+    df_open["display"] = df_open.apply(
+        lambda r: f"ID:{r['id']} | WO:{r['wo_number']} | {r['station']} | P{r.get('priority',99)} | Due:{r.get('due_date','-')} | {r['status']}",
+        axis=1
+    )
+    pick = st.selectbox("Select WO", df_open["display"].tolist(), key="manual_wo_pick")
+    row = df_open[df_open["display"] == pick].iloc[0]
+    wo_id = int(row["id"])
+
+    with st.form("manual_plan_form"):
+        plan_date = st.date_input("Plan execution date", value=ws, key="manual_plan_date")
+        if not techs:
+            st.warning("Add technicians above first.")
+            tech_1 = ""
+            tech_2_opt = "(None)"
+        else:
+            tech_1 = st.selectbox("Technician 1", techs, key="m_tech1")
+            tech_2_opt = st.selectbox("Technician 2 (optional)", ["(None)"] + techs, key="m_tech2")
+        notes = st.text_area("Planning notes (optional)")
+        save = st.form_submit_button("Save Plan")
+
+        if save:
+            if not techs:
+                st.error("No technicians. Add technicians first.")
+            else:
+                t2 = None if tech_2_opt == "(None)" else tech_2_opt
+                if t2 == tech_1:
+                    st.error("Technician 2 cannot be the same as Technician 1.")
+                else:
+                    upsert_plan(
+                        wo_id=wo_id,
+                        plan_date=plan_date.strftime("%Y-%m-%d"),
+                        mode="Manual",
+                        tech_1=tech_1,
+                        tech_2=t2,
+                        notes=notes.strip() if notes else None,
+                    )
+                    st.success("Plan saved.")
+                    st.rerun()
+
+    if st.button("🗑 Remove plan for selected WO", key="btn_remove_plan"):
+        delete_plan(wo_id)
+        st.success("Plan removed.")
+        st.rerun()
+
+    st.divider()
+
+    # ---- Show private plan board (Sun–Thu) ----
+    st.markdown("### 📅 Private Plan Board (Sun–Thu)")
+    plans = fetch_plans_in_period(ws.strftime("%Y-%m-%d"), we.strftime("%Y-%m-%d"))
+    if len(plans) == 0:
+        st.info("No planned items yet for this week.")
+    else:
+        # show board by plan_date
+        work_days = [ws + timedelta(days=i) for i in range(5)]  # Sun..Thu
+        cols = st.columns(5)
+        for i in range(5):
+            d = work_days[i]
+            ds = d.strftime("%Y-%m-%d")
+            dayp = plans[plans["plan_date"] == ds].copy()
+            dayp = dayp.sort_values(["station", "wo_number"])
+
+            with cols[i]:
+                st.markdown(
+                    f'<div class="day-col-title">{DAYS7[i]}<span class="day-chip">({d.strftime("%d %b")})</span></div>',
+                    unsafe_allow_html=True
+                )
+                if len(dayp) == 0:
+                    st.caption("— no planned —")
+                else:
+                    for _, r in dayp.iterrows():
+                        who = f"{r['tech_1']}" + (f" + {r['tech_2']}" if pd.notna(r.get("tech_2")) and str(r.get("tech_2")).strip() else "")
+                        mode_badge = '<span class="badge badge-auto">Auto</span>' if str(r.get("mode")) == "Auto" else '<span class="badge badge-plan">Manual</span>'
+                        st.markdown(
+                            f"""
+                            <div class="card">
+                              <div class="card-title">
+                                WO {safe_str(r.get('wo_number'))} {mode_badge}
+                              </div>
+                              <div class="card-sub">
+                                <b>{safe_str(r.get('station'))}</b> • {safe_str(r.get('location'))}<br/>
+                                {safe_str(r.get('task_type'))} • Due: {safe_str(r.get('due_date'))}<br/>
+                                Tech: <b>{who}</b>
+                              </div>
+                            </div>
+                            """,
+                            unsafe_allow_html=True
+                        )
+
+        st.caption("This plan is stored in wo_plans and does NOT change SAP due dates.")
+with tab_today:
+    st.subheader("Today & Tomorrow Tasks (Execution Plan)")
+
+    # Work days in Oman: Sun–Thu
+    today = date.today()
+    tomorrow = today + timedelta(days=1)
+
+    # If tomorrow is Fri/Sat, you can still show it, but here we keep it simple:
+    st.caption(f"Today: {today} | Tomorrow: {tomorrow}")
+
+    techs = fetch_technicians("Instrument")
+    if not techs:
+        st.warning("No technicians in master list. Add them first (Technicians table).")
+        st.stop()
+
+    # Load planned tasks from wo_plans + details from work_orders
+    conn = get_conn()
+    plans = pd.read_sql_query("""
+        SELECT
+            p.wo_id, p.plan_date, p.mode, p.tech_1, p.tech_2, p.notes as plan_notes,
+            w.wo_number, w.station, w.location, w.task_type, w.priority, w.est_hours,
+            w.due_date, w.status, w.assigned_to, w.completed_date
+        FROM wo_plans p
+        JOIN work_orders w ON w.id = p.wo_id
+        WHERE p.plan_date IN (?, ?)
+        ORDER BY p.plan_date ASC,
+                 CASE w.status WHEN 'Planned' THEN 1 WHEN 'In Progress' THEN 2 WHEN 'Done' THEN 3 ELSE 9 END,
+                 w.priority ASC,
+                 w.due_date ASC
+    """, conn, params=(today.strftime("%Y-%m-%d"), tomorrow.strftime("%Y-%m-%d")))
+    conn.close()
+
+    if plans.empty:
+        st.info("No planned work orders for Today/Tomorrow yet. Create plans in Weekly Planner / Manual planning.")
+        st.stop()
+
+    # Filter view
+    top = st.columns([1.2, 1, 1])
+    view_day = top[0].radio("View", ["Today", "Tomorrow", "Both"], horizontal=True)
+    status_filter = top[1].multiselect("Status", ["Planned", "In Progress", "Done", "Cancelled"], default=["Planned", "In Progress"])
+    tech_filter = top[2].multiselect("Technicians", techs, default=techs)
+
+    v = plans.copy()
+    if view_day != "Both":
+        target = today if view_day == "Today" else tomorrow
+        v = v[v["plan_date"] == target.strftime("%Y-%m-%d")]
+
+    if status_filter:
+        v = v[v["status"].isin(status_filter)]
+
+    # Keep only WOs where tech_1 or tech_2 is in selected list
+    v = v[
+        v["tech_1"].isin(tech_filter) |
+        v["tech_2"].fillna("").isin(tech_filter)
+    ]
+
+    if v.empty:
+        st.info("No items after filters.")
+        st.stop()
+
+    # Group by day then technician
+    for day_s, day_df in v.groupby("plan_date"):
+        day_dt = parse_date_ymd(day_s)
+        st.markdown(f"### 🗓 {day_s} ({day_dt.strftime('%a') if day_dt else ''})")
+
+        # build "tech -> rows" (if WO has two techs, show under both)
+        tech_map = {t: [] for t in tech_filter}
+        for _, r in day_df.iterrows():
+            t1 = str(r["tech_1"]).strip() if r.get("tech_1") else ""
+            t2 = str(r["tech_2"]).strip() if r.get("tech_2") else ""
+            if t1 in tech_map:
+                tech_map[t1].append(r)
+            if t2 in tech_map and t2 != t1:
+                tech_map[t2].append(r)
+
+        for tech, items in tech_map.items():
+            if not items:
+                continue
+
+            with st.expander(f"👷 {tech} — {len(items)} task(s)", expanded=True):
+                for r in items:
+                    wo_id = int(r["wo_id"])
+                    wo_num = safe_str(r.get("wo_number"))
+                    station = safe_str(r.get("station"))
+                    loc = safe_str(r.get("location"))
+                    task_type = safe_str(r.get("task_type"))
+                    status = safe_str(r.get("status"))
+                    due = safe_str(r.get("due_date"))
+                    pr = safe_str(r.get("priority"))
+                    hrs = safe_str(r.get("est_hours"))
+
+                    # Status badge
+                    if status == "Done":
+                        badge = '<span class="badge badge-done">Done</span>'
+                    elif status == "In Progress":
+                        badge = '<span class="badge badge-prog">In Progress</span>'
+                    elif status == "Planned":
+                        badge = '<span class="badge badge-plan">Planned</span>'
+                    else:
+                        badge = f'<span class="badge">{status}</span>'
+
+                    st.markdown(
+                        f"""
+                        <div class="card">
+                          <div class="card-title">
+                            WO {wo_num} {badge}
+                          </div>
+                          <div class="card-sub">
+                            <b>{station}</b> • {loc}<br/>
+                            Type: {task_type} • Priority: {pr} • Est: {hrs}h<br/>
+                            SAP Due: {due}
+                          </div>
+                        </div>
+                        """,
+                        unsafe_allow_html=True
+                    )
+
+                    # ===== Action form (update + checklist + attachment) =====
+                    with st.form(f"wo_update_form_{wo_id}_{tech}_{day_s}"):
+                        cols = st.columns([1.2, 1, 1])
+                        new_status = cols[0].selectbox(
+                            "Update Status",
+                            ["Planned", "In Progress", "Done", "Cancelled"],
+                            index=["Planned", "In Progress", "Done", "Cancelled"].index(status) if status in ["Planned", "In Progress", "Done", "Cancelled"] else 0,
+                        )
+                        performed_by = cols[1].text_input("Performed by", value=tech)
+                        checklist_ok = cols[2].checkbox("Checklist complete", value=False)
+
+                        note = st.text_area("Notes (finding / parts / SAP comment)", height=80)
+                        file = st.file_uploader("Attachment (photo / PDF / report)", key=f"wo_file_{wo_id}_{tech}_{day_s}")
+
+                        save_btn = st.form_submit_button("✅ Save Update")
+
+                        if save_btn:
+                            if not performed_by.strip():
+                                st.error("Performed by is required.")
+                                st.stop()
+
+                            attach_path = None
+                            if file is not None:
+                                safe_name = f"WO_{wo_num}_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{file.name}"
+                                dest = UPLOAD_DIR / safe_name
+                                dest.write_bytes(file.getbuffer())
+                                attach_path = str(dest)
+
+                            # Update status + completed date if Done
+                            comp_date = None
+                            if new_status == "Done":
+                                comp_date = date.today().strftime("%Y-%m-%d")
+
+                            set_wo_status(wo_id, new_status, comp_date)
+
+                            # Log evidence/history
+                            action = "Done" if new_status == "Done" else "Update"
+                            add_wo_update(
+                                wo_id=wo_id,
+                                action=action,
+                                performed_by=performed_by.strip(),
+                                checklist_complete=bool(checklist_ok),
+                                notes=note.strip() if note else None,
+                                attachment_path=attach_path,
+                            )
+
+                            st.success("Saved.")
+                            st.rerun()
+
+                    # ===== History (last 50) =====
+                    hist = get_wo_updates(wo_id)
+                    if len(hist):
+                        with st.expander("📜 Updates History / Evidence"):
+                            hv = hist.copy()
+                            hv["checklist_complete"] = hv["checklist_complete"].map({0: "No", 1: "Yes"})
+                            st.dataframe(hv[["update_ts", "action", "performed_by", "checklist_complete", "notes", "attachment_path"]],
+                                         use_container_width=True, hide_index=True)
+
+                            # show attachments
+                            for i, rr in hist.iterrows():
+                                ap = rr.get("attachment_path")
+                                if ap and str(ap).strip():
+                                    with st.expander(f"📎 {rr['update_ts']} — {rr['performed_by']}"):
+                                        if rr.get("notes"):
+                                            st.write(rr["notes"])
+                                        show_attachment(str(ap), key_prefix=f"wohist_{wo_id}_{i}")
